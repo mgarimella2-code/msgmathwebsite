@@ -1,8 +1,16 @@
-import { siteContent } from "@/lib/content"
+import { getStoredContent } from "@/lib/content-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { ExternalLink, FileText, BookOpen, PenTool, LinkIcon } from "lucide-react"
 import { notFound } from "next/navigation"
+
+const classNames = {
+  "ap-precalc": "AP PreCalc",
+  "math-1-period-1": "Math 1: Period 1",
+  "math-1-honors": "Math 1 Honors",
+  "math-1-period-4": "Math 1: Period 4",
+  "math-1-period-5": "Math 1: Period 5",
+}
 
 const sectionConfig = {
   info: { title: "Important Class Information", icon: FileText, color: "text-blue-600" },
@@ -12,8 +20,15 @@ const sectionConfig = {
   misc: { title: "Miscellaneous Links", icon: LinkIcon, color: "text-red-600" },
 }
 
-export default function ClassPage({ params }: { params: { slug: string } }) {
-  const classData = siteContent.classes[params.slug as keyof typeof siteContent.classes]
+export default async function ClassPage({ params }: { params: { slug: string } }) {
+  const className = classNames[params.slug as keyof typeof classNames]
+
+  if (!className) {
+    notFound()
+  }
+
+  const content = await getStoredContent()
+  const classData = content.classes[params.slug]
 
   if (!classData) {
     notFound()
@@ -28,7 +43,7 @@ export default function ClassPage({ params }: { params: { slug: string } }) {
 
       <div className="space-y-6">
         {Object.entries(sectionConfig).map(([sectionType, config]) => {
-          const sectionContent = classData.sections[sectionType as keyof typeof classData.sections] || []
+          const sectionContent = classData.sections[sectionType] || []
           const IconComponent = config.icon
 
           return (
@@ -42,9 +57,16 @@ export default function ClassPage({ params }: { params: { slug: string } }) {
               <CardContent>
                 {sectionContent.length > 0 ? (
                   <div className="space-y-4">
-                    {sectionContent.map((item) => (
+                    {sectionContent.map((item: any) => (
                       <div key={item.id} className="p-4 bg-white rounded-lg shadow-sm border">
-                        {item.title && <h3 className="font-semibold text-gray-800 mb-2">{item.title}</h3>}
+                        <div className="flex justify-between items-start mb-2">
+                          {item.title && <h3 className="font-semibold text-gray-800">{item.title}</h3>}
+                          {item.dateAdded && (
+                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                              {new Date(item.dateAdded).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
                         {item.content && <p className="text-gray-700 mb-3 whitespace-pre-line">{item.content}</p>}
                         {item.linkUrl && (
                           <Link
@@ -61,7 +83,7 @@ export default function ClassPage({ params }: { params: { slug: string } }) {
                   </div>
                 ) : (
                   <p className="text-gray-500 italic">
-                    No content available for this section yet. Content can be added by editing the content file.
+                    No content available for this section yet. Content will appear here once added by Ms. G.
                   </p>
                 )}
               </CardContent>

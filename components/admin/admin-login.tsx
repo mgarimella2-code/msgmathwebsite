@@ -56,13 +56,6 @@ export default function AdminLogin() {
               Login
             </Button>
           </form>
-
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>Your admin password is:</strong> <code className="bg-blue-100 px-2 py-1 rounded">MsG2024!</code>
-            </p>
-            <p className="text-xs text-blue-600 mt-2">You can change this password in the admin-context.tsx file</p>
-          </div>
         </CardContent>
       </Card>
     </div>

@@ -2,7 +2,7 @@
 
 import { useAdmin } from "@/contexts/admin-context"
 import AdminLogin from "@/components/admin/admin-login"
-import ContentEditorServer from "@/components/admin/content-editor-server"
+import ClassContentEditor from "@/components/admin/class-content-editor"
 import { Button } from "@/components/ui/button"
 import { LogOut } from "lucide-react"
 
@@ -24,7 +24,7 @@ export default function AdminPage() {
           </Button>
         </div>
       </div>
-      <ContentEditorServer />
+      <ClassContentEditor />
     </div>
   )
 }

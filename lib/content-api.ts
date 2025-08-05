@@ -73,3 +73,52 @@ export async function updateAnnouncements(announcements: any[]) {
   }
   return await saveContent(updatedContent)
 }
+
+export async function updateClassContent(className: string, sectionType: string, items: any[]) {
+  const currentContent = await getStoredContent()
+  const updatedContent = {
+    ...currentContent,
+    classes: {
+      ...currentContent.classes,
+      [className]: {
+        ...currentContent.classes[className],
+        sections: {
+          ...currentContent.classes[className].sections,
+          [sectionType]: items,
+        },
+      },
+    },
+  }
+  return await saveContent(updatedContent)
+}
+
+export async function addClassContentItem(className: string, sectionType: string, item: any) {
+  const currentContent = await getStoredContent()
+  const currentItems = currentContent.classes[className]?.sections[sectionType] || []
+
+  const newItem = {
+    ...item,
+    id: Date.now(),
+    dateAdded: new Date().toISOString().split("T")[0], // Add date for tracking
+  }
+
+  const updatedItems = [newItem, ...currentItems] // Add new items to the top
+
+  return await updateClassContent(className, sectionType, updatedItems)
+}
+
+export async function removeClassContentItem(className: string, sectionType: string, itemId: number) {
+  const currentContent = await getStoredContent()
+  const currentItems = currentContent.classes[className]?.sections[sectionType] || []
+  const updatedItems = currentItems.filter((item: any) => item.id !== itemId)
+
+  return await updateClassContent(className, sectionType, updatedItems)
+}
+
+export async function updateClassContentItem(className: string, sectionType: string, itemId: number, updates: any) {
+  const currentContent = await getStoredContent()
+  const currentItems = currentContent.classes[className]?.sections[sectionType] || []
+  const updatedItems = currentItems.map((item: any) => (item.id === itemId ? { ...item, ...updates } : item))
+
+  return await updateClassContent(className, sectionType, updatedItems)
+}
