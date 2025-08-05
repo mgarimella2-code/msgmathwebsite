@@ -1,16 +1,8 @@
-import { getClassContent } from "@/lib/database"
+import { siteContent } from "@/lib/content"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { ExternalLink, FileText, BookOpen, PenTool, LinkIcon } from "lucide-react"
 import { notFound } from "next/navigation"
-
-const classNames = {
-  "ap-precalc": "AP PreCalc",
-  "math-1-period-1": "Math 1: Period 1",
-  "math-1-honors": "Math 1 Honors",
-  "math-1-period-4": "Math 1: Period 4",
-  "math-1-period-5": "Math 1: Period 5",
-}
 
 const sectionConfig = {
   info: { title: "Important Class Information", icon: FileText, color: "text-blue-600" },
@@ -20,44 +12,23 @@ const sectionConfig = {
   misc: { title: "Miscellaneous Links", icon: LinkIcon, color: "text-red-600" },
 }
 
-export default async function ClassPage({ params }: { params: { slug: string } }) {
-  const className = classNames[params.slug as keyof typeof classNames]
+export default function ClassPage({ params }: { params: { slug: string } }) {
+  const classData = siteContent.classes[params.slug as keyof typeof siteContent.classes]
 
-  if (!className) {
+  if (!classData) {
     notFound()
   }
-
-  let classContent: any[] = []
-  try {
-    classContent = await getClassContent(className)
-  } catch (error) {
-    console.warn("Failed to load class content:", error)
-    classContent = []
-  }
-
-  // Group content by section type
-  const contentBySections =
-    classContent?.reduce(
-      (acc, item) => {
-        if (!acc[item.section_type]) {
-          acc[item.section_type] = []
-        }
-        acc[item.section_type].push(item)
-        return acc
-      },
-      {} as Record<string, any[]>,
-    ) || {}
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-purple-700 mb-2">{className}</h1>
+        <h1 className="text-4xl font-bold text-purple-700 mb-2">{classData.name}</h1>
         <p className="text-gray-600">Find all resources and information for this class below.</p>
       </div>
 
       <div className="space-y-6">
         {Object.entries(sectionConfig).map(([sectionType, config]) => {
-          const sectionContent = contentBySections[sectionType] || []
+          const sectionContent = classData.sections[sectionType as keyof typeof classData.sections] || []
           const IconComponent = config.icon
 
           return (
@@ -75,9 +46,9 @@ export default async function ClassPage({ params }: { params: { slug: string } }
                       <div key={item.id} className="p-4 bg-white rounded-lg shadow-sm border">
                         {item.title && <h3 className="font-semibold text-gray-800 mb-2">{item.title}</h3>}
                         {item.content && <p className="text-gray-700 mb-3 whitespace-pre-line">{item.content}</p>}
-                        {item.link_url && (
+                        {item.linkUrl && (
                           <Link
-                            href={item.link_url}
+                            href={item.linkUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium"
@@ -90,7 +61,7 @@ export default async function ClassPage({ params }: { params: { slug: string } }
                   </div>
                 ) : (
                   <p className="text-gray-500 italic">
-                    No content available for this section yet. Content will appear here once the admin adds resources.
+                    No content available for this section yet. Content can be added by editing the content file.
                   </p>
                 )}
               </CardContent>

@@ -2,10 +2,10 @@
 
 import type React from "react"
 import Link from "next/link"
-import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ChevronDown, LogOut, Edit } from "lucide-react"
+import { ChevronDown, Edit } from "lucide-react"
+import { useAdmin } from "@/contexts/admin-context"
 
 const classes = [
   { name: "AP PreCalc", slug: "ap-precalc" },
@@ -16,7 +16,7 @@ const classes = [
 ]
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
-  const { user, signOut, isAdmin } = useAuth()
+  const { isAdmin } = useAdmin()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
@@ -51,25 +51,39 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             </div>
 
             <div className="flex items-center space-x-4">
-              {isAdmin && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/admin">
-                    <Edit className="h-4 w-4 mr-2" />
-                    Admin
-                  </Link>
-                </Button>
-              )}
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/admin">
+                  <Edit className="h-4 w-4 mr-2" />
+                  {isAdmin ? "Admin Dashboard" : "Admin Login"}
+                </Link>
+              </Button>
 
-              {user ? (
-                <Button variant="ghost" size="sm" onClick={signOut}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/login">Admin Login</Link>
-                </Button>
-              )}
+              {/* Mobile menu */}
+              <div className="md:hidden">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      Menu <ChevronDown className="ml-1 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href="/">Home</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/announcements">Announcements</Link>
+                    </DropdownMenuItem>
+                    {classes.map((cls) => (
+                      <DropdownMenuItem key={cls.slug} asChild>
+                        <Link href={`/class/${cls.slug}`}>{cls.name}</Link>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin">Admin</Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
         </div>
