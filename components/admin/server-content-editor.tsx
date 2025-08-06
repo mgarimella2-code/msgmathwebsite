@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon } from 'lucide-react'
+import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon, Cloud } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   getServerContent,
@@ -18,6 +18,7 @@ import {
   updateClassContentItem,
   updateAnnouncements,
 } from "@/lib/content-api"
+import GoogleBackup from "./google-backup"
 
 const classes = [
   { name: "AP PreCalc", slug: "ap-precalc" },
@@ -220,9 +221,13 @@ export default function ServerContentEditor() {
       )}
 
       <Tabs defaultValue="classes" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="classes">Class Content</TabsTrigger>
           <TabsTrigger value="announcements">Announcements</TabsTrigger>
+          <TabsTrigger value="backup">
+            <Cloud className="h-4 w-4 mr-2" />
+            Google Backup
+          </TabsTrigger>
         </TabsList>
 
         {/* Class Content */}
@@ -402,6 +407,11 @@ export default function ServerContentEditor() {
               </CardContent>
             </Card>
           ))}
+        </TabsContent>
+
+        {/* Google Backup */}
+        <TabsContent value="backup">
+          <GoogleBackup />
         </TabsContent>
       </Tabs>
     </div>

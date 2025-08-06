@@ -5,9 +5,11 @@ export async function getServerContent() {
       cache: 'no-store', // Always get fresh data
     })
     if (!response.ok) {
-      throw new Error('Failed to fetch content')
+      throw new Error(`Failed to fetch content: ${response.status}`)
     }
-    return await response.json()
+    const data = await response.json()
+    console.log('Loaded content from server:', Object.keys(data))
+    return data
   } catch (error) {
     console.error('Error fetching content:', error)
     throw error
@@ -16,6 +18,7 @@ export async function getServerContent() {
 
 export async function saveServerContent(content: any) {
   try {
+    console.log('Saving content to server:', Object.keys(content))
     const response = await fetch('/api/content', {
       method: 'POST',
       headers: {
@@ -25,10 +28,13 @@ export async function saveServerContent(content: any) {
     })
     
     if (!response.ok) {
-      throw new Error('Failed to save content')
+      const errorData = await response.json()
+      throw new Error(`Failed to save content: ${response.status} - ${errorData.error || 'Unknown error'}`)
     }
     
-    return await response.json()
+    const result = await response.json()
+    console.log('Successfully saved content to server')
+    return result
   } catch (error) {
     console.error('Error saving content:', error)
     throw error
@@ -37,26 +43,33 @@ export async function saveServerContent(content: any) {
 
 export async function addClassContentItem(className: string, sectionType: string, item: any) {
   try {
+    console.log(`Adding item to ${className} -> ${sectionType}:`, item)
+    
     const currentContent = await getServerContent()
+    console.log('Current content loaded, classes:', Object.keys(currentContent.classes))
     
     // Ensure the class exists
     if (!currentContent.classes[className]) {
-      return { success: false, error: "Class not found" }
+      console.error(`Class ${className} not found in:`, Object.keys(currentContent.classes))
+      return { success: false, error: `Class ${className} not found` }
     }
     
     // Ensure the sections object exists
     if (!currentContent.classes[className].sections) {
+      console.log(`Creating sections object for ${className}`)
       currentContent.classes[className].sections = {}
     }
     
     // Get current items for this section
     const currentItems = currentContent.classes[className].sections[sectionType] || []
+    console.log(`Current items in ${sectionType}:`, currentItems.length)
 
     const newItem = {
       ...item,
       id: Date.now(),
       dateAdded: new Date().toISOString().split("T")[0],
     }
+    console.log('Created new item:', newItem)
 
     const updatedItems = [newItem, ...currentItems]
     
@@ -74,19 +87,26 @@ export async function addClassContentItem(className: string, sectionType: string
       },
     }
     
+    console.log(`Updated ${sectionType} section, now has ${updatedItems.length} items`)
+    
     const result = await saveServerContent(updatedContent)
+    console.log('Save result:', result)
     return { success: result.success }
   } catch (error) {
     console.error('Error adding class content item:', error)
-    return { success: false, error: 'Failed to add item' }
+    return { success: false, error: `Failed to add item: ${error instanceof Error ? error.message : 'Unknown error'}` }
   }
 }
 
 export async function removeClassContentItem(className: string, sectionType: string, itemId: number) {
   try {
+    console.log(`Removing item ${itemId} from ${className} -> ${sectionType}`)
+    
     const currentContent = await getServerContent()
     const currentItems = currentContent.classes[className]?.sections[sectionType] || []
     const updatedItems = currentItems.filter((item: any) => item.id !== itemId)
+
+    console.log(`Filtered items: ${currentItems.length} -> ${updatedItems.length}`)
 
     const updatedContent = {
       ...currentContent,
@@ -112,6 +132,8 @@ export async function removeClassContentItem(className: string, sectionType: str
 
 export async function updateClassContentItem(className: string, sectionType: string, itemId: number, updates: any) {
   try {
+    console.log(`Updating item ${itemId} in ${className} -> ${sectionType}:`, updates)
+    
     const currentContent = await getServerContent()
     const currentItems = currentContent.classes[className]?.sections[sectionType] || []
     const updatedItems = currentItems.map((item: any) => (item.id === itemId ? { ...item, ...updates } : item))
@@ -140,6 +162,8 @@ export async function updateClassContentItem(className: string, sectionType: str
 
 export async function updateAnnouncements(announcements: any[]) {
   try {
+    console.log('Updating announcements:', announcements.length)
+    
     const currentContent = await getServerContent()
     const updatedContent = {
       ...currentContent,

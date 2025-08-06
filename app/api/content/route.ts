@@ -6,7 +6,7 @@ import path from 'path'
 const CONTENT_DIR = path.join(process.cwd(), 'data')
 const CONTENT_FILE = path.join(CONTENT_DIR, 'content.json')
 
-// Default content
+// Default content with sample data
 const defaultContent = {
   welcome: {
     title: "Welcome",
@@ -30,11 +30,51 @@ const defaultContent = {
     "ap-precalc": {
       name: "AP PreCalc",
       sections: {
-        info: [],
-        notes: [],
-        study_guides: [],
-        classwork: [],
-        misc: [],
+        info: [
+          {
+            id: 1,
+            title: "Welcome to AP PreCalc!",
+            content: "This is an advanced course that will prepare you for AP Calculus. Please make sure you have your graphing calculator for every class.",
+            linkUrl: "",
+            dateAdded: "2024-01-15"
+          }
+        ],
+        notes: [
+          {
+            id: 2,
+            title: "Chapter 1: Functions and Graphs",
+            content: "Complete notes covering function notation, domain/range, and graphing techniques.",
+            linkUrl: "https://docs.google.com/document/d/example-chapter1-notes",
+            dateAdded: "2024-01-16"
+          }
+        ],
+        study_guides: [
+          {
+            id: 3,
+            title: "Unit 1 Study Guide Answer Key",
+            content: "Complete solutions for the Unit 1 study guide covering functions and transformations.",
+            linkUrl: "https://docs.google.com/document/d/example-unit1-answers",
+            dateAdded: "2024-01-20"
+          }
+        ],
+        classwork: [
+          {
+            id: 4,
+            title: "Daily Warm-ups Week 1",
+            content: "Practice problems for function evaluation and graphing. Complete these before class starts.",
+            linkUrl: "https://docs.google.com/document/d/example-warmups-week1",
+            dateAdded: "2024-01-15"
+          }
+        ],
+        misc: [
+          {
+            id: 5,
+            title: "AP Exam Information",
+            content: "Important dates and information about the AP PreCalc exam in May.",
+            linkUrl: "https://apcentral.collegeboard.org/courses/ap-precalculus",
+            dateAdded: "2024-01-10"
+          }
+        ],
       },
     },
     "math-1-period-1": {
@@ -93,11 +133,13 @@ async function ensureContentFile() {
     // Create data directory if it doesn't exist
     if (!existsSync(CONTENT_DIR)) {
       await mkdir(CONTENT_DIR, { recursive: true })
+      console.log('Created data directory')
     }
 
     // Create content file if it doesn't exist
     if (!existsSync(CONTENT_FILE)) {
       await writeFile(CONTENT_FILE, JSON.stringify(defaultContent, null, 2))
+      console.log('Created content file with default data')
     }
   } catch (error) {
     console.error('Error ensuring content file:', error)
@@ -108,9 +150,12 @@ export async function GET() {
   try {
     await ensureContentFile()
     const content = await readFile(CONTENT_FILE, 'utf-8')
-    return NextResponse.json(JSON.parse(content))
+    const parsedContent = JSON.parse(content)
+    console.log('Successfully loaded content from file')
+    return NextResponse.json(parsedContent)
   } catch (error) {
     console.error('Error reading content:', error)
+    console.log('Returning default content due to error')
     return NextResponse.json(defaultContent)
   }
 }
@@ -118,11 +163,19 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const newContent = await request.json()
+    console.log('Received content to save:', Object.keys(newContent))
+    
     await ensureContentFile()
     await writeFile(CONTENT_FILE, JSON.stringify(newContent, null, 2))
+    
+    console.log('Successfully saved content to file')
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error saving content:', error)
-    return NextResponse.json({ success: false, error: 'Failed to save content' }, { status: 500 })
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to save content',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
