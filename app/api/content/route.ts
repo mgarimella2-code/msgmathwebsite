@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, readFile, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import path from 'path'
 
-const CONTENT_DIR = path.join(process.cwd(), 'data')
-const CONTENT_FILE = path.join(CONTENT_DIR, 'content.json')
+// Since we can't write files in Vercel's serverless environment,
+// we'll use a simple in-memory store that resets on deployment
+// This is a temporary solution - in production you'd use a database
 
-// Default content with sample data
+let contentStore: any = null
+
+// Default content
 const defaultContent = {
   welcome: {
     title: "Welcome",
@@ -128,34 +128,14 @@ const defaultContent = {
   ],
 }
 
-async function ensureContentFile() {
-  try {
-    // Create data directory if it doesn't exist
-    if (!existsSync(CONTENT_DIR)) {
-      await mkdir(CONTENT_DIR, { recursive: true })
-      console.log('Created data directory')
-    }
-
-    // Create content file if it doesn't exist
-    if (!existsSync(CONTENT_FILE)) {
-      await writeFile(CONTENT_FILE, JSON.stringify(defaultContent, null, 2))
-      console.log('Created content file with default data')
-    }
-  } catch (error) {
-    console.error('Error ensuring content file:', error)
-  }
-}
-
 export async function GET() {
   try {
-    await ensureContentFile()
-    const content = await readFile(CONTENT_FILE, 'utf-8')
-    const parsedContent = JSON.parse(content)
-    console.log('Successfully loaded content from file')
-    return NextResponse.json(parsedContent)
+    // Return stored content or default content
+    const content = contentStore || defaultContent
+    console.log('Returning content with classes:', Object.keys(content.classes))
+    return NextResponse.json(content)
   } catch (error) {
-    console.error('Error reading content:', error)
-    console.log('Returning default content due to error')
+    console.error('Error in GET /api/content:', error)
     return NextResponse.json(defaultContent)
   }
 }
@@ -163,15 +143,15 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const newContent = await request.json()
-    console.log('Received content to save:', Object.keys(newContent))
+    console.log('Received content to store:', Object.keys(newContent))
     
-    await ensureContentFile()
-    await writeFile(CONTENT_FILE, JSON.stringify(newContent, null, 2))
+    // Store in memory (this will reset on server restart)
+    contentStore = newContent
     
-    console.log('Successfully saved content to file')
+    console.log('Successfully stored content in memory')
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error saving content:', error)
+    console.error('Error in POST /api/content:', error)
     return NextResponse.json({ 
       success: false, 
       error: 'Failed to save content',

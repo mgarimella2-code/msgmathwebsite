@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getServerContent } from "@/lib/content-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { ExternalLink, FileText, BookOpen, PenTool, LinkIcon, RefreshCw } from 'lucide-react'
@@ -30,14 +29,42 @@ export default function ClassPage({ params }: { params: { slug: string } }) {
 
   useEffect(() => {
     loadContent()
+    
+    // Listen for storage changes from admin panel
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'ms-g-website-content' && e.newValue) {
+        try {
+          const newContent = JSON.parse(e.newValue)
+          setContent(newContent)
+        } catch (err) {
+          console.warn('Failed to parse updated content:', err)
+        }
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
   const loadContent = async () => {
     try {
       setLoading(true)
       setError("")
-      const serverContent = await getServerContent()
-      setContent(serverContent)
+      
+      // Try localStorage first
+      const localContent = localStorage.getItem('ms-g-website-content')
+      if (localContent) {
+        const parsedContent = JSON.parse(localContent)
+        setContent(parsedContent)
+      } else {
+        // Fallback to server
+        const response = await fetch('/api/content', { cache: 'no-store' })
+        if (response.ok) {
+          const serverContent = await response.json()
+          setContent(serverContent)
+          localStorage.setItem('ms-g-website-content', JSON.stringify(serverContent))
+        }
+      }
     } catch (err) {
       setError("Failed to load content")
       console.error("Load error:", err)
