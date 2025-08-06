@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 let contentStore: any = null
 
-// Default content
+// Default content with calendar support
 const defaultContent = {
   welcome: {
     title: "Welcome",

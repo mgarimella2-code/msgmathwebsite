@@ -87,10 +87,10 @@ export default function HomePage() {
       {/* Welcome Section */}
       <Card className="bg-white/70 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-3xl font-bold text-purple-700">{welcome.title}</CardTitle>
+          <CardTitle className="text-3xl font-bold text-purple-700">{welcome?.title || "Welcome"}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-lg text-gray-700 leading-relaxed">{welcome.content}</p>
+          <p className="text-lg text-gray-700 leading-relaxed">{welcome?.content || "Welcome to Ms. G's math classes!"}</p>
         </CardContent>
       </Card>
 
@@ -101,7 +101,7 @@ export default function HomePage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3">
-            {importantLinks.map((link: any) => (
+            {importantLinks?.map((link: any) => (
               <Link
                 key={link.id}
                 href={link.url}
@@ -123,23 +123,15 @@ export default function HomePage() {
           <CardTitle className="text-2xl font-bold text-green-700">Weekly Schedule</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
-            <div className="text-center p-8">
-              <p className="text-gray-600 mb-4">
-                📅 <strong>Weekly Schedule</strong>
-              </p>
-              <p className="text-sm text-gray-500 mb-4">
-                The Google Doc cannot be embedded here due to privacy settings.
-              </p>
-              <Link
-                href="https://docs.google.com/document/d/1vHaPr962yHnKlVPTMlyPC4bIUZH7IkNRUATfqTXV9yc/edit?usp=drive_link"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                View Weekly Schedule <ExternalLink className="ml-2 h-4 w-4" />
-              </Link>
-            </div>
+          <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200">
+            <iframe
+              src="https://docs.google.com/document/d/1vHaPr962yHnKlVPTMlyPC4bIUZH7IkNRUATfqTXV9yc/edit?usp=sharing&embedded=true"
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              className="w-full h-full"
+              title="Weekly Schedule"
+            />
           </div>
         </CardContent>
       </Card>
@@ -149,7 +141,7 @@ export default function HomePage() {
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-orange-700 flex items-center">
             <span className="mr-2">📧</span>
-            {contact.title}
+            {contact?.title || "Contact Information"}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -162,8 +154,8 @@ export default function HomePage() {
               </h3>
               <p className="text-gray-700">
                 Feel free to email me at anytime at{" "}
-                <a href={`mailto:${contact.email}`} className="text-blue-600 hover:text-blue-800 font-medium underline">
-                  {contact.email}
+                <a href={`mailto:${contact?.email}`} className="text-blue-600 hover:text-blue-800 font-medium underline">
+                  {contact?.email}
                 </a>
               </p>
             </div>
@@ -174,7 +166,7 @@ export default function HomePage() {
                 <span className="mr-2">🕐</span>
                 Office Hours
               </h3>
-              <p className="text-gray-700">{contact.officeHours}</p>
+              <p className="text-gray-700">{contact?.officeHours}</p>
               <p className="text-sm text-gray-600 mt-1">Find me in room 230!</p>
             </div>
 
@@ -185,7 +177,7 @@ export default function HomePage() {
                 Tutoring
               </h3>
               <p className="text-gray-700">
-                <strong>{contact.tutoring}</strong>
+                <strong>{contact?.tutoring}</strong>
               </p>
               <p className="text-sm text-gray-600 mt-1">Extra help available!</p>
             </div>
@@ -197,7 +189,7 @@ export default function HomePage() {
                 Make-up Quizzes & Tests
               </h3>
               <p className="text-gray-700">
-                <strong>{contact.makeupTests}</strong>
+                <strong>{contact?.makeupTests}</strong>
               </p>
             </div>
           </div>
