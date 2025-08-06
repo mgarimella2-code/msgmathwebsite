@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon } from 'lucide-react'
+import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon, Download, Upload } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   getContent,
@@ -18,6 +18,7 @@ import {
   updateClassContentItem,
   loadContentFromStorage,
 } from "@/lib/content-store"
+import ExportImport from "./export-import"
 
 const classes = [
   { name: "AP PreCalc", slug: "ap-precalc" },
@@ -152,13 +153,13 @@ export default function ClassContentEditor() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-purple-700">Content Editor</h1>
         <p className="text-gray-600">
-          Add and manage content for your classes - changes are saved automatically
+          Add and manage content for your classes - use Export/Import to sync across devices
         </p>
       </div>
 
       {saved && (
         <Alert className="mb-6">
-          <AlertDescription>✅ Content saved successfully!</AlertDescription>
+          <AlertDescription>✅ Content saved successfully! Use Export/Import to sync to other devices.</AlertDescription>
         </Alert>
       )}
 
@@ -169,9 +170,10 @@ export default function ClassContentEditor() {
       )}
 
       <Tabs defaultValue="classes" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="classes">Class Content</TabsTrigger>
           <TabsTrigger value="announcements">Announcements</TabsTrigger>
+          <TabsTrigger value="sync">Sync Devices</TabsTrigger>
         </TabsList>
 
         {/* Class Content */}
@@ -349,6 +351,11 @@ export default function ClassContentEditor() {
               </CardContent>
             </Card>
           ))}
+        </TabsContent>
+
+        {/* Sync Devices */}
+        <TabsContent value="sync">
+          <ExportImport />
         </TabsContent>
       </Tabs>
     </div>
