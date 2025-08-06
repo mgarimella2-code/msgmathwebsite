@@ -19,14 +19,26 @@ export default function HomePage() {
         try {
           const newContent = JSON.parse(e.newValue)
           setContent(newContent)
+          console.log('Homepage content updated via storage event')
         } catch (err) {
           console.warn('Failed to parse updated content:', err)
         }
       }
     }
     
+    // Also listen for custom events (for same-tab updates)
+    const handleCustomUpdate = () => {
+      console.log('Custom update event received on homepage')
+      loadContent()
+    }
+    
     window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
+    window.addEventListener('content-updated', handleCustomUpdate)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('content-updated', handleCustomUpdate)
+    }
   }, [])
 
   const loadContent = async () => {
