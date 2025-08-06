@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getContent, loadContentFromStorage } from "@/lib/content-store"
+import { getServerContent } from "@/lib/content-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { ExternalLink, FileText, BookOpen, PenTool, LinkIcon } from 'lucide-react'
+import { ExternalLink, FileText, BookOpen, PenTool, LinkIcon, RefreshCw } from 'lucide-react'
 import { notFound } from "next/navigation"
 
 const classNames = {
@@ -24,25 +24,56 @@ const sectionConfig = {
 }
 
 export default function ClassPage({ params }: { params: { slug: string } }) {
-  const [content, setContent] = useState(getContent())
+  const [content, setContent] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    loadContentFromStorage()
-    setContent(getContent())
-    
-    // Listen for content updates
-    const handleStorageChange = () => {
-      setContent(getContent())
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
+    loadContent()
   }, [])
+
+  const loadContent = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      const serverContent = await getServerContent()
+      setContent(serverContent)
+    } catch (err) {
+      setError("Failed to load content")
+      console.error("Load error:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const className = classNames[params.slug as keyof typeof classNames]
 
   if (!className) {
     notFound()
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-purple-600" />
+          <span className="ml-2 text-lg">Loading class content...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !content) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Failed to load class content</p>
+          <button onClick={loadContent} className="px-4 py-2 bg-purple-600 text-white rounded">
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const classData = content.classes[params.slug]

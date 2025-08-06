@@ -1,24 +1,56 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getContent, loadContentFromStorage } from "@/lib/content-store"
+import { getServerContent } from "@/lib/content-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { RefreshCw } from 'lucide-react'
 
 export default function AnnouncementsPage() {
-  const [content, setContent] = useState(getContent())
+  const [content, setContent] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    loadContentFromStorage()
-    setContent(getContent())
-    
-    // Listen for content updates
-    const handleStorageChange = () => {
-      setContent(getContent())
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
+    loadContent()
   }, [])
+
+  const loadContent = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      const serverContent = await getServerContent()
+      setContent(serverContent)
+    } catch (err) {
+      setError("Failed to load content")
+      console.error("Load error:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-purple-600" />
+          <span className="ml-2 text-lg">Loading announcements...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !content) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Failed to load announcements</p>
+          <button onClick={loadContent} className="px-4 py-2 bg-purple-600 text-white rounded">
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const { announcements } = content
 
@@ -31,7 +63,7 @@ export default function AnnouncementsPage() {
 
       <div className="space-y-6">
         {announcements.length > 0 ? (
-          announcements.map((announcement) => (
+          announcements.map((announcement: any) => (
             <Card key={announcement.id} className="bg-white/70 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-xl font-bold text-blue-700">{announcement.title}</CardTitle>
