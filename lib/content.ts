@@ -23,60 +23,17 @@ export const siteContent = {
     "ap-precalc": {
       name: "AP PreCalc",
       sections: {
-        info: [
-          {
-            id: 1,
-            title: "Class Information",
-            content:
-              "Welcome to AP PreCalc! This is where important class announcements and information will be posted.",
-            linkUrl: "",
-          },
-        ],
-        notes: [
-          {
-            id: 1,
-            title: "Class Notes",
-            content: "Access all class notes and materials here.",
-            linkUrl: "",
-          },
-        ],
-        study_guides: [
-          {
-            id: 1,
-            title: "Study Guide Answer Keys",
-            content: "Find answer keys for study guides here.",
-            linkUrl: "",
-          },
-        ],
-        classwork: [
-          {
-            id: 1,
-            title: "Classwork Information",
-            content: "Daily classwork assignments and information.",
-            linkUrl: "",
-          },
-        ],
-        misc: [
-          {
-            id: 1,
-            title: "Additional Resources",
-            content: "Extra resources and helpful links for AP PreCalc.",
-            linkUrl: "",
-          },
-        ],
+        info: [],
+        notes: [],
+        study_guides: [],
+        classwork: [],
+        misc: [],
       },
     },
     "math-1-period-1": {
       name: "Math 1: Period 1",
       sections: {
-        info: [
-          {
-            id: 1,
-            title: "Class Information",
-            content: "Welcome to Math 1 Period 1! Check here for important updates.",
-            linkUrl: "",
-          },
-        ],
+        info: [],
         notes: [],
         study_guides: [],
         classwork: [],
@@ -86,14 +43,7 @@ export const siteContent = {
     "math-1-honors": {
       name: "Math 1 Honors",
       sections: {
-        info: [
-          {
-            id: 1,
-            title: "Class Information",
-            content: "Welcome to Math 1 Honors! This class moves at an accelerated pace.",
-            linkUrl: "",
-          },
-        ],
+        info: [],
         notes: [],
         study_guides: [],
         classwork: [],
@@ -103,14 +53,7 @@ export const siteContent = {
     "math-1-period-4": {
       name: "Math 1: Period 4",
       sections: {
-        info: [
-          {
-            id: 1,
-            title: "Class Information",
-            content: "Welcome to Math 1 Period 4! Check here for important updates.",
-            linkUrl: "",
-          },
-        ],
+        info: [],
         notes: [],
         study_guides: [],
         classwork: [],
@@ -120,14 +63,7 @@ export const siteContent = {
     "math-1-period-5": {
       name: "Math 1: Period 5",
       sections: {
-        info: [
-          {
-            id: 1,
-            title: "Class Information",
-            content: "Welcome to Math 1 Period 5! Check here for important updates.",
-            linkUrl: "",
-          },
-        ],
+        info: [],
         notes: [],
         study_guides: [],
         classwork: [],

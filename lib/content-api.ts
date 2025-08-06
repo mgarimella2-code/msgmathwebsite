@@ -76,6 +76,17 @@ export async function updateAnnouncements(announcements: any[]) {
 
 export async function updateClassContent(className: string, sectionType: string, items: any[]) {
   const currentContent = await getStoredContent()
+  
+  // Ensure the class exists
+  if (!currentContent.classes[className]) {
+    return { success: false, error: "Class not found" }
+  }
+  
+  // Ensure sections exist
+  if (!currentContent.classes[className].sections) {
+    currentContent.classes[className].sections = {}
+  }
+  
   const updatedContent = {
     ...currentContent,
     classes: {
@@ -94,15 +105,27 @@ export async function updateClassContent(className: string, sectionType: string,
 
 export async function addClassContentItem(className: string, sectionType: string, item: any) {
   const currentContent = await getStoredContent()
-  const currentItems = currentContent.classes[className]?.sections[sectionType] || []
+  
+  // Ensure the class exists
+  if (!currentContent.classes[className]) {
+    return { success: false, error: "Class not found" }
+  }
+  
+  // Ensure the sections object exists
+  if (!currentContent.classes[className].sections) {
+    currentContent.classes[className].sections = {}
+  }
+  
+  // Get current items for this section
+  const currentItems = currentContent.classes[className].sections[sectionType] || []
 
   const newItem = {
     ...item,
     id: Date.now(),
-    dateAdded: new Date().toISOString().split("T")[0], // Add date for tracking
+    dateAdded: new Date().toISOString().split("T")[0],
   }
 
-  const updatedItems = [newItem, ...currentItems] // Add new items to the top
+  const updatedItems = [newItem, ...currentItems]
 
   return await updateClassContent(className, sectionType, updatedItems)
 }

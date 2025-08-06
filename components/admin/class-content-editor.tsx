@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon } from "lucide-react"
+import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   getStoredContent,
@@ -49,9 +49,12 @@ export default function ClassContentEditor() {
   const loadContent = async () => {
     try {
       setLoading(true)
+      setError("") // Clear errors
       const storedContent = await getStoredContent()
+      console.log("Loaded content:", storedContent) // Debug log
       setContent(storedContent)
     } catch (err) {
+      console.error("Error loading content:", err)
       setError("Failed to load content")
     } finally {
       setLoading(false)
@@ -60,23 +63,31 @@ export default function ClassContentEditor() {
 
   const handleAddItem = async (sectionType: string) => {
     setSaving(true)
+    setError("") // Clear any previous errors
+    
     try {
       const newItem = {
-        title: "",
-        content: "",
+        title: "New Item",
+        content: "Click to edit this content...",
         linkUrl: "",
       }
 
+      console.log("Adding item to:", selectedClass, sectionType) // Debug log
+      
       const result = await addClassContentItem(selectedClass, sectionType, newItem)
+      
+      console.log("Add result:", result) // Debug log
+      
       if (result.success) {
         await loadContent() // Refresh content
         setSaved(true)
         setTimeout(() => setSaved(false), 3000)
       } else {
-        setError("Failed to add item")
+        setError(`Failed to add item: ${result.error || "Unknown error"}`)
       }
     } catch (err) {
-      setError("Failed to add item")
+      console.error("Error adding item:", err)
+      setError("Failed to add item - check console for details")
     } finally {
       setSaving(false)
     }
