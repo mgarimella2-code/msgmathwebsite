@@ -36,42 +36,26 @@ export default function ClassPage({ params }: { params: { slug: string } }) {
         try {
           const newContent = JSON.parse(e.newValue)
           setContent(newContent)
-          console.log('Content updated via storage event for class:', params.slug)
         } catch (err) {
           console.warn('Failed to parse updated content:', err)
         }
       }
     }
     
-    // Also listen for custom events (for same-tab updates)
-    const handleCustomUpdate = () => {
-      console.log('Custom update event received for class:', params.slug)
-      loadContent()
-    }
-    
     window.addEventListener('storage', handleStorageChange)
-    window.addEventListener('content-updated', handleCustomUpdate)
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      window.removeEventListener('content-updated', handleCustomUpdate)
-    }
-  }, [params.slug])
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
 
   const loadContent = async () => {
     try {
       setLoading(true)
       setError("")
       
-      console.log('Loading content for class:', params.slug)
-      
       // Try localStorage first
       const localContent = localStorage.getItem('ms-g-website-content')
       if (localContent) {
         const parsedContent = JSON.parse(localContent)
         setContent(parsedContent)
-        console.log('Loaded content from localStorage for class:', params.slug)
-        console.log('Available classes:', Object.keys(parsedContent.classes || {}))
       } else {
         // Fallback to server
         const response = await fetch('/api/content', { cache: 'no-store' })
@@ -79,12 +63,11 @@ export default function ClassPage({ params }: { params: { slug: string } }) {
           const serverContent = await response.json()
           setContent(serverContent)
           localStorage.setItem('ms-g-website-content', JSON.stringify(serverContent))
-          console.log('Loaded content from server for class:', params.slug)
         }
       }
     } catch (err) {
       setError("Failed to load content")
-      console.error("Load error for class", params.slug, ":", err)
+      console.error("Load error:", err)
     } finally {
       setLoading(false)
     }

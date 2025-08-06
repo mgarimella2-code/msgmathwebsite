@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon, Download, Upload, Copy, ExternalLink } from 'lucide-react'
+import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon, Download, Upload, Copy } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const classes = [
@@ -72,47 +72,40 @@ export default function SimpleContentEditor() {
   }
 
   const saveContent = async (newContent: any) => {
-  try {
-    setSaving(true)
-    
-    // Save to localStorage immediately
-    localStorage.setItem('ms-g-website-content', JSON.stringify(newContent))
-    
-    // Try to save to server (but don't fail if it doesn't work)
     try {
-      await fetch('/api/content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newContent)
-      })
-      console.log('Saved to server successfully')
-    } catch (serverError) {
-      console.warn('Server save failed, but localStorage save succeeded:', serverError)
+      setSaving(true)
+      
+      // Save to localStorage immediately
+      localStorage.setItem('ms-g-website-content', JSON.stringify(newContent))
+      
+      // Try to save to server (but don't fail if it doesn't work)
+      try {
+        await fetch('/api/content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newContent)
+        })
+        console.log('Saved to server successfully')
+      } catch (serverError) {
+        console.warn('Server save failed, but localStorage save succeeded:', serverError)
+      }
+      
+      // Trigger storage event for cross-tab sync
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'ms-g-website-content',
+        newValue: JSON.stringify(newContent)
+      }))
+      
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+      
+    } catch (err) {
+      setError("Failed to save content")
+      console.error("Save error:", err)
+    } finally {
+      setSaving(false)
     }
-    
-    // Trigger storage event for cross-tab sync
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'ms-g-website-content',
-      newValue: JSON.stringify(newContent)
-    }))
-    
-    // Trigger custom event for same-tab updates
-    window.dispatchEvent(new CustomEvent('content-updated', {
-      detail: { content: newContent }
-    }))
-    
-    console.log('Content saved and events dispatched')
-    
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-    
-  } catch (err) {
-    setError("Failed to save content")
-    console.error("Save error:", err)
-  } finally {
-    setSaving(false)
   }
-}
 
   const handleAddItem = async (sectionType: string) => {
     if (!content) return
@@ -234,63 +227,6 @@ export default function SimpleContentEditor() {
     
     const newAnnouncements = content.announcements.filter((_: any, i: number) => i !== index)
     setContent({ ...content, announcements: newAnnouncements })
-  }
-
-  const updateWelcome = (field: string, value: string) => {
-    if (!content) return
-    
-    const updatedContent = {
-      ...content,
-      welcome: { ...content.welcome, [field]: value },
-    }
-    setContent(updatedContent)
-  }
-
-  const updateContact = (field: string, value: string) => {
-    if (!content) return
-    
-    const updatedContent = {
-      ...content,
-      contact: { ...content.contact, [field]: value },
-    }
-    setContent(updatedContent)
-  }
-
-  const saveHomepageSettings = async () => {
-    if (!content) return
-    await saveContent(content)
-  }
-
-  const updateImportantLink = (index: number, field: string, value: string) => {
-    if (!content) return
-    
-    const newLinks = [...content.importantLinks]
-    newLinks[index] = { ...newLinks[index], [field]: value }
-    setContent({ ...content, importantLinks: newLinks })
-  }
-
-  const addImportantLink = () => {
-    if (!content) return
-    
-    const newLink = {
-      id: Date.now(),
-      title: "New Link",
-      url: "https://example.com",
-    }
-    
-    const updatedContent = {
-      ...content,
-      importantLinks: [...content.importantLinks, newLink],
-    }
-    
-    setContent(updatedContent)
-  }
-
-  const removeImportantLink = (index: number) => {
-    if (!content) return
-    
-    const newLinks = content.importantLinks.filter((_: any, i: number) => i !== index)
-    setContent({ ...content, importantLinks: newLinks })
   }
 
   const handleExport = () => {
