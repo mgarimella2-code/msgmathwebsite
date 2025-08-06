@@ -11,12 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  getStoredContent,
+  getContent,
+  updateContent,
   addClassContentItem,
   removeClassContentItem,
   updateClassContentItem,
-  updateAnnouncements,
-} from "@/lib/content-api"
+  loadContentFromStorage,
+} from "@/lib/content-store"
 
 const classes = [
   { name: "AP PreCalc", slug: "ap-precalc" },
@@ -35,34 +36,22 @@ const sectionConfig = {
 }
 
 export default function ClassContentEditor() {
-  const [content, setContent] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [content, setContent] = useState(getContent())
+  const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState("")
   const [selectedClass, setSelectedClass] = useState("ap-precalc")
 
   useEffect(() => {
-    loadContent()
+    loadContentFromStorage()
+    setContent(getContent())
   }, [])
 
-  const loadContent = async () => {
-    try {
-      setLoading(true)
-      setError("") // Clear errors
-      const storedContent = await getStoredContent()
-      console.log("Loaded content:", storedContent) // Debug log
-      setContent(storedContent)
-    } catch (err) {
-      console.error("Error loading content:", err)
-      setError("Failed to load content")
-    } finally {
-      setLoading(false)
-    }
+  const refreshContent = () => {
+    setContent(getContent())
   }
 
-  const handleAddItem = async (sectionType: string) => {
-    setSaving(true)
+  const handleAddItem = (sectionType: string) => {
     setError("") // Clear any previous errors
     
     try {
@@ -74,12 +63,12 @@ export default function ClassContentEditor() {
 
       console.log("Adding item to:", selectedClass, sectionType) // Debug log
       
-      const result = await addClassContentItem(selectedClass, sectionType, newItem)
+      const result = addClassContentItem(selectedClass, sectionType, newItem)
       
       console.log("Add result:", result) // Debug log
       
       if (result.success) {
-        await loadContent() // Refresh content
+        refreshContent()
         setSaved(true)
         setTimeout(() => setSaved(false), 3000)
       } else {
@@ -88,17 +77,14 @@ export default function ClassContentEditor() {
     } catch (err) {
       console.error("Error adding item:", err)
       setError("Failed to add item - check console for details")
-    } finally {
-      setSaving(false)
     }
   }
 
-  const handleUpdateItem = async (sectionType: string, itemId: number, field: string, value: string) => {
-    setSaving(true)
+  const handleUpdateItem = (sectionType: string, itemId: number, field: string, value: string) => {
     try {
-      const result = await updateClassContentItem(selectedClass, sectionType, itemId, { [field]: value })
+      const result = updateClassContentItem(selectedClass, sectionType, itemId, { [field]: value })
       if (result.success) {
-        await loadContent() // Refresh content
+        refreshContent()
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
       } else {
@@ -106,17 +92,14 @@ export default function ClassContentEditor() {
       }
     } catch (err) {
       setError("Failed to update item")
-    } finally {
-      setSaving(false)
     }
   }
 
-  const handleRemoveItem = async (sectionType: string, itemId: number) => {
-    setSaving(true)
+  const handleRemoveItem = (sectionType: string, itemId: number) => {
     try {
-      const result = await removeClassContentItem(selectedClass, sectionType, itemId)
+      const result = removeClassContentItem(selectedClass, sectionType, itemId)
       if (result.success) {
-        await loadContent() // Refresh content
+        refreshContent()
         setSaved(true)
         setTimeout(() => setSaved(false), 3000)
       } else {
@@ -124,26 +107,17 @@ export default function ClassContentEditor() {
       }
     } catch (err) {
       setError("Failed to remove item")
-    } finally {
-      setSaving(false)
     }
   }
 
-  const handleSaveAnnouncements = async () => {
+  const handleSaveAnnouncements = () => {
     if (!content) return
-    setSaving(true)
     try {
-      const result = await updateAnnouncements(content.announcements)
-      if (result.success) {
-        setSaved(true)
-        setTimeout(() => setSaved(false), 3000)
-      } else {
-        setError("Failed to save announcements")
-      }
+      updateContent(content)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       setError("Failed to save announcements")
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -171,27 +145,6 @@ export default function ClassContentEditor() {
     setContent({ ...content, announcements: newAnnouncements })
   }
 
-  if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-purple-600" />
-          <span className="ml-2 text-lg">Loading content...</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (!content) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <Alert variant="destructive">
-          <AlertDescription>Failed to load content. Please refresh the page.</AlertDescription>
-        </Alert>
-      </div>
-    )
-  }
-
   const currentClass = content.classes[selectedClass]
 
   return (
@@ -199,13 +152,13 @@ export default function ClassContentEditor() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-purple-700">Content Editor</h1>
         <p className="text-gray-600">
-          Add and manage content for your classes - all changes are visible to students immediately
+          Add and manage content for your classes - changes are saved automatically
         </p>
       </div>
 
       {saved && (
         <Alert className="mb-6">
-          <AlertDescription>✅ Content saved successfully! Students can now see your updates.</AlertDescription>
+          <AlertDescription>✅ Content saved successfully!</AlertDescription>
         </Alert>
       )}
 
@@ -263,7 +216,6 @@ export default function ClassContentEditor() {
                         </div>
                         <Button
                           onClick={() => handleAddItem(sectionType)}
-                          disabled={saving}
                           className="flex items-center"
                         >
                           <Plus className="h-4 w-4 mr-2" />
@@ -289,7 +241,6 @@ export default function ClassContentEditor() {
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => handleRemoveItem(sectionType, item.id)}
-                                  disabled={saving}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -349,9 +300,9 @@ export default function ClassContentEditor() {
                 <Plus className="h-4 w-4 mr-2" />
                 Add Announcement
               </Button>
-              <Button onClick={handleSaveAnnouncements} disabled={saving} className="flex items-center">
+              <Button onClick={handleSaveAnnouncements} className="flex items-center">
                 <Save className="h-4 w-4 mr-2" />
-                {saving ? "Saving..." : "Save Announcements"}
+                Save Announcements
               </Button>
             </div>
           </div>

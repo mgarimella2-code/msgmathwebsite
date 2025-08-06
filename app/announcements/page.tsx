@@ -1,8 +1,25 @@
-import { getStoredContent } from "@/lib/content-api"
+"use client"
+
+import { useEffect, useState } from "react"
+import { getContent, loadContentFromStorage } from "@/lib/content-store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default async function AnnouncementsPage() {
-  const content = await getStoredContent()
+export default function AnnouncementsPage() {
+  const [content, setContent] = useState(getContent())
+
+  useEffect(() => {
+    loadContentFromStorage()
+    setContent(getContent())
+    
+    // Listen for content updates
+    const handleStorageChange = () => {
+      setContent(getContent())
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
   const { announcements } = content
 
   return (
@@ -14,7 +31,7 @@ export default async function AnnouncementsPage() {
 
       <div className="space-y-6">
         {announcements.length > 0 ? (
-          announcements.map((announcement: any) => (
+          announcements.map((announcement) => (
             <Card key={announcement.id} className="bg-white/70 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-xl font-bold text-blue-700">{announcement.title}</CardTitle>

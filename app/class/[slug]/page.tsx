@@ -1,7 +1,10 @@
-import { getStoredContent } from "@/lib/content-api"
+"use client"
+
+import { useEffect, useState } from "react"
+import { getContent, loadContentFromStorage } from "@/lib/content-store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { ExternalLink, FileText, BookOpen, PenTool, LinkIcon } from "lucide-react"
+import { ExternalLink, FileText, BookOpen, PenTool, LinkIcon } from 'lucide-react'
 import { notFound } from "next/navigation"
 
 const classNames = {
@@ -20,14 +23,28 @@ const sectionConfig = {
   misc: { title: "Miscellaneous Links", icon: LinkIcon, color: "text-red-600" },
 }
 
-export default async function ClassPage({ params }: { params: { slug: string } }) {
+export default function ClassPage({ params }: { params: { slug: string } }) {
+  const [content, setContent] = useState(getContent())
+
+  useEffect(() => {
+    loadContentFromStorage()
+    setContent(getContent())
+    
+    // Listen for content updates
+    const handleStorageChange = () => {
+      setContent(getContent())
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
   const className = classNames[params.slug as keyof typeof classNames]
 
   if (!className) {
     notFound()
   }
 
-  const content = await getStoredContent()
   const classData = content.classes[params.slug]
 
   if (!classData) {

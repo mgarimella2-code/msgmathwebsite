@@ -1,10 +1,27 @@
-import { getStoredContent } from "@/lib/content-api"
+"use client"
+
+import { useEffect, useState } from "react"
+import { getContent, loadContentFromStorage } from "@/lib/content-store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { ExternalLink } from "lucide-react"
+import { ExternalLink } from 'lucide-react'
 
-export default async function HomePage() {
-  const content = await getStoredContent()
+export default function HomePage() {
+  const [content, setContent] = useState(getContent())
+
+  useEffect(() => {
+    loadContentFromStorage()
+    setContent(getContent())
+    
+    // Listen for content updates
+    const handleStorageChange = () => {
+      setContent(getContent())
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
   const { welcome, contact, importantLinks } = content
 
   return (
@@ -26,7 +43,7 @@ export default async function HomePage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3">
-            {importantLinks.map((link: any) => (
+            {importantLinks.map((link) => (
               <Link
                 key={link.id}
                 href={link.url}
@@ -48,15 +65,23 @@ export default async function HomePage() {
           <CardTitle className="text-2xl font-bold text-green-700">Weekly Schedule</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200">
-            <iframe
-              src="https://docs.google.com/document/d/1vHaPr962yHnKlVPTMlyPC4bIUZH7IkNRUATfqTXV9yc/edit?usp=sharing&embedded=true"
-              width="100%"
-              height="100%"
-              className="border-0"
-              title="Weekly Schedule"
-              allow="fullscreen"
-            />
+          <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
+            <div className="text-center p-8">
+              <p className="text-gray-600 mb-4">
+                📅 <strong>Weekly Schedule</strong>
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                The Google Doc cannot be embedded here due to privacy settings.
+              </p>
+              <Link
+                href="https://docs.google.com/document/d/1vHaPr962yHnKlVPTMlyPC4bIUZH7IkNRUATfqTXV9yc/edit?usp=drive_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                View Weekly Schedule <ExternalLink className="ml-2 h-4 w-4" />
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>
