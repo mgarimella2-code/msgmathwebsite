@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from "next/server"
 
 // Since we can't write files in Vercel's serverless environment,
 // we'll use a simple in-memory store that resets on deployment
@@ -10,7 +10,8 @@ let contentStore: any = null
 const defaultContent = {
   welcome: {
     title: "Welcome",
-    content: "Hi all! This is Ms. G's website :) You can find all the information for class you need here and a weekly schedule! But if you have a question remember you can always find me in room 230!",
+    content:
+      "Hi all! This is Ms. G's website :) You can find all the information for class you need here and a weekly schedule! But if you have a question remember you can always find me in room 230!",
   },
   contact: {
     title: "Ms. G's Contact Info :)",
@@ -34,10 +35,11 @@ const defaultContent = {
           {
             id: 1,
             title: "Welcome to AP PreCalc!",
-            content: "This is an advanced course that will prepare you for AP Calculus. Please make sure you have your graphing calculator for every class.",
+            content:
+              "This is an advanced course that will prepare you for AP Calculus. Please make sure you have your graphing calculator for every class.",
             linkUrl: "",
-            dateAdded: "2024-01-15"
-          }
+            dateAdded: "2024-01-15",
+          },
         ],
         notes: [
           {
@@ -45,8 +47,8 @@ const defaultContent = {
             title: "Chapter 1: Functions and Graphs",
             content: "Complete notes covering function notation, domain/range, and graphing techniques.",
             linkUrl: "https://docs.google.com/document/d/example-chapter1-notes",
-            dateAdded: "2024-01-16"
-          }
+            dateAdded: "2024-01-16",
+          },
         ],
         study_guides: [
           {
@@ -54,8 +56,8 @@ const defaultContent = {
             title: "Unit 1 Study Guide Answer Key",
             content: "Complete solutions for the Unit 1 study guide covering functions and transformations.",
             linkUrl: "https://docs.google.com/document/d/example-unit1-answers",
-            dateAdded: "2024-01-20"
-          }
+            dateAdded: "2024-01-20",
+          },
         ],
         classwork: [
           {
@@ -63,8 +65,8 @@ const defaultContent = {
             title: "Daily Warm-ups Week 1",
             content: "Practice problems for function evaluation and graphing. Complete these before class starts.",
             linkUrl: "https://docs.google.com/document/d/example-warmups-week1",
-            dateAdded: "2024-01-15"
-          }
+            dateAdded: "2024-01-15",
+          },
         ],
         misc: [
           {
@@ -72,8 +74,8 @@ const defaultContent = {
             title: "AP Exam Information",
             content: "Important dates and information about the AP PreCalc exam in May.",
             linkUrl: "https://apcentral.collegeboard.org/courses/ap-precalculus",
-            dateAdded: "2024-01-10"
-          }
+            dateAdded: "2024-01-10",
+          },
         ],
       },
     },
@@ -122,7 +124,8 @@ const defaultContent = {
     {
       id: 1,
       title: "Welcome to the New School Year!",
-      content: "Welcome back students! I'm excited for another great year of math. Please check your class pages for specific information.",
+      content:
+        "Welcome back students! I'm excited for another great year of math. Please check your class pages for specific information.",
       date: "2024-08-15",
     },
   ],
@@ -132,10 +135,10 @@ export async function GET() {
   try {
     // Return stored content or default content
     const content = contentStore || defaultContent
-    console.log('Returning content with classes:', Object.keys(content.classes))
+    console.log("Returning content with classes:", Object.keys(content.classes))
     return NextResponse.json(content)
   } catch (error) {
-    console.error('Error in GET /api/content:', error)
+    console.error("Error in GET /api/content:", error)
     return NextResponse.json(defaultContent)
   }
 }
@@ -143,19 +146,25 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const newContent = await request.json()
-    console.log('Received content to store:', Object.keys(newContent))
-    
+    console.log("API: Received content to store")
+    console.log("API: Classes in content:", Object.keys(newContent.classes || {}))
+
     // Store in memory (this will reset on server restart)
     contentStore = newContent
-    
-    console.log('Successfully stored content in memory')
+
+    console.log("API: Successfully stored content in memory")
+    console.log("API: Stored classes:", Object.keys(contentStore.classes || {}))
+
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in POST /api/content:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Failed to save content',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    console.error("API: Error in POST /api/content:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to save content",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

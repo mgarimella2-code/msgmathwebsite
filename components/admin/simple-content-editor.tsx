@@ -8,7 +8,19 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon, Download, Upload, Copy } from 'lucide-react'
+import {
+  Save,
+  Plus,
+  Trash2,
+  RefreshCw,
+  FileText,
+  BookOpen,
+  PenTool,
+  LinkIcon,
+  Download,
+  Upload,
+  Copy,
+} from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const classes = [
@@ -45,22 +57,22 @@ export default function SimpleContentEditor() {
     try {
       setLoading(true)
       setError("")
-      
+
       // Try to load from localStorage first
-      const localContent = localStorage.getItem('ms-g-website-content')
+      const localContent = localStorage.getItem("ms-g-website-content")
       if (localContent) {
         const parsedContent = JSON.parse(localContent)
         setContent(parsedContent)
-        console.log('Loaded content from localStorage')
+        console.log("Loaded content from localStorage")
       } else {
         // Fallback to server
-        const response = await fetch('/api/content', { cache: 'no-store' })
+        const response = await fetch("/api/content", { cache: "no-store" })
         if (response.ok) {
           const serverContent = await response.json()
           setContent(serverContent)
           // Save to localStorage for future use
-          localStorage.setItem('ms-g-website-content', JSON.stringify(serverContent))
-          console.log('Loaded content from server and saved to localStorage')
+          localStorage.setItem("ms-g-website-content", JSON.stringify(serverContent))
+          console.log("Loaded content from server and saved to localStorage")
         }
       }
     } catch (err) {
@@ -74,31 +86,42 @@ export default function SimpleContentEditor() {
   const saveContent = async (newContent: any) => {
     try {
       setSaving(true)
-      
+
       // Save to localStorage immediately
-      localStorage.setItem('ms-g-website-content', JSON.stringify(newContent))
-      
+      localStorage.setItem("ms-g-website-content", JSON.stringify(newContent))
+      console.log("Saved to localStorage:", selectedClass, Object.keys(newContent.classes[selectedClass].sections))
+
       // Try to save to server (but don't fail if it doesn't work)
       try {
-        await fetch('/api/content', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newContent)
+        const response = await fetch("/api/content", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newContent),
         })
-        console.log('Saved to server successfully')
+        if (response.ok) {
+          console.log("Saved to server successfully")
+        } else {
+          console.warn("Server save failed, but localStorage save succeeded")
+        }
       } catch (serverError) {
-        console.warn('Server save failed, but localStorage save succeeded:', serverError)
+        console.warn("Server save failed, but localStorage save succeeded:", serverError)
       }
-      
+
       // Trigger storage event for cross-tab sync
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: 'ms-g-website-content',
-        newValue: JSON.stringify(newContent)
-      }))
-      
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "ms-g-website-content",
+          newValue: JSON.stringify(newContent),
+        }),
+      )
+
+      // Force a page reload to ensure changes are visible
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
-      
     } catch (err) {
       setError("Failed to save content")
       console.error("Save error:", err)
@@ -109,9 +132,10 @@ export default function SimpleContentEditor() {
 
   const handleAddItem = async (sectionType: string) => {
     if (!content) return
-    
+
     setError("")
-    
+    console.log("Adding item to:", selectedClass, sectionType)
+
     const newItem = {
       id: Date.now(),
       title: "New Item",
@@ -122,7 +146,9 @@ export default function SimpleContentEditor() {
 
     const currentItems = content.classes[selectedClass]?.sections[sectionType] || []
     const updatedItems = [newItem, ...currentItems]
-    
+
+    console.log("Current items:", currentItems.length, "Updated items:", updatedItems.length)
+
     const updatedContent = {
       ...content,
       classes: {
@@ -136,18 +162,16 @@ export default function SimpleContentEditor() {
         },
       },
     }
-    
+
     setContent(updatedContent)
     await saveContent(updatedContent)
   }
 
   const handleUpdateItem = async (sectionType: string, itemId: number, field: string, value: string) => {
     if (!content) return
-    
+
     const currentItems = content.classes[selectedClass]?.sections[sectionType] || []
-    const updatedItems = currentItems.map((item: any) => 
-      item.id === itemId ? { ...item, [field]: value } : item
-    )
+    const updatedItems = currentItems.map((item: any) => (item.id === itemId ? { ...item, [field]: value } : item))
 
     const updatedContent = {
       ...content,
@@ -162,14 +186,14 @@ export default function SimpleContentEditor() {
         },
       },
     }
-    
+
     setContent(updatedContent)
     await saveContent(updatedContent)
   }
 
   const handleRemoveItem = async (sectionType: string, itemId: number) => {
     if (!content) return
-    
+
     const currentItems = content.classes[selectedClass]?.sections[sectionType] || []
     const updatedItems = currentItems.filter((item: any) => item.id !== itemId)
 
@@ -186,7 +210,7 @@ export default function SimpleContentEditor() {
         },
       },
     }
-    
+
     setContent(updatedContent)
     await saveContent(updatedContent)
   }
@@ -198,25 +222,25 @@ export default function SimpleContentEditor() {
 
   const addAnnouncement = () => {
     if (!content) return
-    
+
     const newAnnouncement = {
       id: Date.now(),
       title: "New Announcement",
       content: "Enter your announcement content here...",
       date: new Date().toISOString().split("T")[0],
     }
-    
+
     const updatedContent = {
       ...content,
       announcements: [newAnnouncement, ...content.announcements],
     }
-    
+
     setContent(updatedContent)
   }
 
   const updateAnnouncement = (index: number, field: string, value: string) => {
     if (!content) return
-    
+
     const newAnnouncements = [...content.announcements]
     newAnnouncements[index] = { ...newAnnouncements[index], [field]: value }
     setContent({ ...content, announcements: newAnnouncements })
@@ -224,20 +248,20 @@ export default function SimpleContentEditor() {
 
   const removeAnnouncement = (index: number) => {
     if (!content) return
-    
+
     const newAnnouncements = content.announcements.filter((_: any, i: number) => i !== index)
     setContent({ ...content, announcements: newAnnouncements })
   }
 
   const handleExport = () => {
     if (!content) return
-    
+
     const exportObj = {
       timestamp: new Date().toISOString(),
       content: content,
-      version: "1.0"
+      version: "1.0",
     }
-    
+
     const jsonData = JSON.stringify(exportObj, null, 2)
     setExportData(jsonData)
   }
@@ -279,7 +303,7 @@ export default function SimpleContentEditor() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Alert variant="destructive">
           <AlertDescription>
-            Failed to load content. 
+            Failed to load content.
             <Button onClick={loadContent} className="ml-2" size="sm">
               Try Again
             </Button>
@@ -295,9 +319,7 @@ export default function SimpleContentEditor() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-purple-700">Content Editor</h1>
-        <p className="text-gray-600">
-          ✅ Changes save automatically! Use Export/Import to sync between devices.
-        </p>
+        <p className="text-gray-600">✅ Changes save automatically! Use Export/Import to sync between devices.</p>
       </div>
 
       {saved && (
@@ -513,14 +535,12 @@ export default function SimpleContentEditor() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Export your content to copy to other devices or save as backup.
-              </p>
+              <p className="text-sm text-gray-600">Export your content to copy to other devices or save as backup.</p>
               <Button onClick={handleExport} className="flex items-center">
                 <Download className="h-4 w-4 mr-2" />
                 Export Content
               </Button>
-              
+
               {exportData && (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
@@ -530,12 +550,7 @@ export default function SimpleContentEditor() {
                       Copy
                     </Button>
                   </div>
-                  <Textarea
-                    value={exportData}
-                    readOnly
-                    rows={8}
-                    className="font-mono text-xs"
-                  />
+                  <Textarea value={exportData} readOnly rows={8} className="font-mono text-xs" />
                 </div>
               )}
             </CardContent>
@@ -549,9 +564,7 @@ export default function SimpleContentEditor() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Paste exported content from another device to sync your changes.
-              </p>
+              <p className="text-sm text-gray-600">Paste exported content from another device to sync your changes.</p>
               <Textarea
                 value={importData}
                 onChange={(e) => setImportData(e.target.value)}
