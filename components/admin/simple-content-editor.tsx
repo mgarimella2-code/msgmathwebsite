@@ -115,11 +115,6 @@ export default function SimpleContentEditor() {
         }),
       )
 
-      // Force a page reload to ensure changes are visible
-      setTimeout(() => {
-        window.location.reload()
-      }, 1000)
-
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
