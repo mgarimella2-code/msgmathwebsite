@@ -4,11 +4,13 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Database, CheckCircle, AlertTriangle, RefreshCw, Info } from "lucide-react"
+import { Database, CheckCircle, AlertTriangle, RefreshCw, TestTube } from "lucide-react"
 
 export default function DatabaseSetup() {
   const [loading, setLoading] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [result, setResult] = useState<any>(null)
+  const [testResult, setTestResult] = useState<any>(null)
   const [error, setError] = useState("")
   const [hasDatabase, setHasDatabase] = useState<boolean | null>(null)
 
@@ -23,6 +25,38 @@ export default function DatabaseSetup() {
       setHasDatabase(hasEnvVars)
     } catch (err) {
       setHasDatabase(false)
+    }
+  }
+
+  const testDatabaseConnection = async () => {
+    try {
+      setTesting(true)
+      setTestResult(null)
+      setError("")
+
+      console.log("Testing database connection...")
+
+      const response = await fetch("/api/test-database", {
+        method: "GET",
+      })
+
+      const data = await response.json()
+      setTestResult(data)
+
+      if (data.success) {
+        console.log("Database test successful!")
+      } else {
+        console.error("Database test failed:", data.error)
+      }
+    } catch (err) {
+      console.error("Database test error:", err)
+      setTestResult({
+        success: false,
+        error: "Test request failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      })
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -81,17 +115,57 @@ export default function DatabaseSetup() {
             </ul>
           </div>
 
-          {hasDatabase === false && (
-            <Alert className="border-orange-200 bg-orange-50">
-              <Info className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800">
-                <strong>Database Not Configured:</strong> No database connection found. The website will work with
-                24-hour storage limits. To enable permanent storage, you'll need to configure a database connection.
-              </AlertDescription>
-            </Alert>
-          )}
+          {/* Test Database Connection */}
+          <div className="space-y-3">
+            <Button
+              onClick={testDatabaseConnection}
+              disabled={testing}
+              variant="outline"
+              className="w-full flex items-center justify-center bg-transparent"
+            >
+              {testing ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Testing connection...
+                </>
+              ) : (
+                <>
+                  <TestTube className="h-4 w-4 mr-2" />
+                  Test Database Connection
+                </>
+              )}
+            </Button>
 
-          {hasDatabase === true && !result?.success && (
+            {testResult && (
+              <Alert className={testResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+                {testResult.success ? (
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                )}
+                <AlertDescription className={testResult.success ? "text-green-800" : "text-red-800"}>
+                  <strong>{testResult.success ? "✅ Connection Successful!" : "❌ Connection Failed:"}</strong>
+                  <br />
+                  {testResult.message || testResult.error}
+                  {testResult.details && (
+                    <>
+                      <br />
+                      <span className="text-sm">Details: {testResult.details}</span>
+                    </>
+                  )}
+                  {testResult.suggestion && (
+                    <>
+                      <br />
+                      <span className="text-sm font-medium">💡 {testResult.suggestion}</span>
+                    </>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          {/* Setup Database Button */}
+          {testResult?.success && !result?.success && (
             <Button onClick={setupDatabase} disabled={loading} className="w-full flex items-center justify-center">
               {loading ? (
                 <>
@@ -132,8 +206,8 @@ export default function DatabaseSetup() {
           )}
 
           <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded">
-            <strong>Note:</strong> Database setup is optional. The website works perfectly without it, but changes may
-            be lost after 24 hours. With database setup, changes are permanent forever.
+            <strong>Troubleshooting:</strong> If the connection test fails, your database might be sleeping, have
+            network restrictions, or need reconfiguration. The website works perfectly without database setup.
           </div>
         </CardContent>
       </Card>
@@ -163,7 +237,7 @@ export default function DatabaseSetup() {
               <span className="font-medium">Database Storage (Permanent)</span>
               <span
                 className={`flex items-center ${
-                  result?.success ? "text-green-600" : hasDatabase === false ? "text-gray-500" : "text-orange-600"
+                  result?.success ? "text-green-600" : testResult?.success ? "text-orange-600" : "text-gray-500"
                 }`}
               >
                 {result?.success ? (
@@ -171,15 +245,15 @@ export default function DatabaseSetup() {
                     <CheckCircle className="h-4 w-4 mr-1" />
                     Active
                   </>
-                ) : hasDatabase === false ? (
+                ) : testResult?.success ? (
                   <>
                     <AlertTriangle className="h-4 w-4 mr-1" />
-                    Not Configured
+                    Ready to Setup
                   </>
                 ) : (
                   <>
                     <AlertTriangle className="h-4 w-4 mr-1" />
-                    Not Set Up
+                    Not Available
                   </>
                 )}
               </span>
