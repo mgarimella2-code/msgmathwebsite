@@ -8,21 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  Save,
-  Plus,
-  Trash2,
-  RefreshCw,
-  FileText,
-  BookOpen,
-  PenTool,
-  LinkIcon,
-  Download,
-  Upload,
-  Copy,
-  AlertTriangle,
-} from "lucide-react"
+import { Save, Plus, Trash2, RefreshCw, FileText, BookOpen, PenTool, LinkIcon, Database, Globe } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { saveContentToDatabase, loadContentFromDatabase } from "@/lib/supabase"
 
 const classes = [
   { name: "AP PreCalc", slug: "ap-precalc" },
@@ -40,15 +28,13 @@ const sectionConfig = {
   misc: { title: "Miscellaneous Links", icon: LinkIcon, color: "text-red-600" },
 }
 
-export default function SimpleContentEditor() {
+export default function DatabaseContentEditor() {
   const [content, setContent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState("")
   const [selectedClass, setSelectedClass] = useState("ap-precalc")
-  const [exportData, setExportData] = useState("")
-  const [importData, setImportData] = useState("")
 
   useEffect(() => {
     loadContent()
@@ -59,23 +45,25 @@ export default function SimpleContentEditor() {
       setLoading(true)
       setError("")
 
-      // Try to load from localStorage first (most reliable)
-      const localContent = localStorage.getItem("ms-g-website-content")
-      if (localContent) {
-        const parsedContent = JSON.parse(localContent)
-        setContent(parsedContent)
-        console.log("Loaded content from localStorage")
-        return
-      }
+      console.log("Loading content from database...")
+      const result = await loadContentFromDatabase()
 
-      // Fallback to server for initial load
-      const response = await fetch("/api/content", { cache: "no-store" })
-      if (response.ok) {
-        const serverContent = await response.json()
-        setContent(serverContent)
-        // Save to localStorage immediately
-        localStorage.setItem("ms-g-website-content", JSON.stringify(serverContent))
-        console.log("Loaded content from server and saved to localStorage")
+      if (result.success && result.content) {
+        setContent(result.content)
+        console.log("Loaded content from database")
+
+        // Also save to localStorage as backup
+        localStorage.setItem("ms-g-website-content", JSON.stringify(result.content))
+      } else {
+        // Fallback to localStorage if database fails
+        const localContent = localStorage.getItem("ms-g-website-content")
+        if (localContent) {
+          const parsedContent = JSON.parse(localContent)
+          setContent(parsedContent)
+          console.log("Loaded content from localStorage fallback")
+        } else {
+          throw new Error("No content available")
+        }
       }
     } catch (err) {
       setError("Failed to load content")
@@ -88,24 +76,30 @@ export default function SimpleContentEditor() {
   const saveContent = async (newContent: any) => {
     try {
       setSaving(true)
+      setError("")
 
-      // Save to localStorage immediately (this is our primary storage)
-      localStorage.setItem("ms-g-website-content", JSON.stringify(newContent))
-      console.log("Saved to localStorage:", selectedClass, Object.keys(newContent.classes[selectedClass].sections))
+      console.log("Saving content to database...")
 
-      // Trigger storage event for cross-tab sync
-      window.dispatchEvent(
-        new StorageEvent("storage", {
-          key: "ms-g-website-content",
-          newValue: JSON.stringify(newContent),
-        }),
-      )
+      // Save to database first
+      const result = await saveContentToDatabase(newContent)
 
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
+      if (result.success) {
+        console.log("Content saved to database successfully")
+
+        // Also save to localStorage as backup
+        localStorage.setItem("ms-g-website-content", JSON.stringify(newContent))
+
+        setSaved(true)
+        setTimeout(() => setSaved(false), 3000)
+      } else {
+        throw new Error("Database save failed")
+      }
     } catch (err) {
-      setError("Failed to save content")
+      setError("Failed to save content to database")
       console.error("Save error:", err)
+
+      // Fallback: save to localStorage only
+      localStorage.setItem("ms-g-website-content", JSON.stringify(newContent))
     } finally {
       setSaving(false)
     }
@@ -127,8 +121,6 @@ export default function SimpleContentEditor() {
 
     const currentItems = content.classes[selectedClass]?.sections[sectionType] || []
     const updatedItems = [newItem, ...currentItems]
-
-    console.log("Current items:", currentItems.length, "Updated items:", updatedItems.length)
 
     const updatedContent = {
       ...content,
@@ -234,46 +226,12 @@ export default function SimpleContentEditor() {
     setContent({ ...content, announcements: newAnnouncements })
   }
 
-  const handleExport = () => {
-    if (!content) return
-
-    const exportObj = {
-      timestamp: new Date().toISOString(),
-      content: content,
-      version: "1.0",
-    }
-
-    const jsonData = JSON.stringify(exportObj, null, 2)
-    setExportData(jsonData)
-  }
-
-  const handleImport = async () => {
-    try {
-      const parsedData = JSON.parse(importData)
-      if (parsedData.content) {
-        setContent(parsedData.content)
-        await saveContent(parsedData.content)
-        setImportData("")
-        setSaved(true)
-        setTimeout(() => setSaved(false), 3000)
-      }
-    } catch (err) {
-      setError("Invalid import data format")
-    }
-  }
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(exportData)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
-
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-center">
           <RefreshCw className="h-8 w-8 animate-spin text-purple-600" />
-          <span className="ml-2 text-lg">Loading content...</span>
+          <span className="ml-2 text-lg">Loading content from database...</span>
         </div>
       </div>
     )
@@ -284,7 +242,7 @@ export default function SimpleContentEditor() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Alert variant="destructive">
           <AlertDescription>
-            Failed to load content.
+            Failed to load content from database.
             <Button onClick={loadContent} className="ml-2" size="sm">
               Try Again
             </Button>
@@ -300,21 +258,24 @@ export default function SimpleContentEditor() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-purple-700">Content Editor</h1>
-        <p className="text-gray-600">✅ Changes save to your browser! Use Export/Import to sync between devices.</p>
+        <p className="text-gray-600 flex items-center">
+          <Database className="h-4 w-4 mr-2 text-green-600" />✅ Changes are saved to database and visible to ALL
+          students on ALL devices instantly!
+        </p>
       </div>
 
-      {/* Important Notice */}
-      <Alert className="mb-6 border-orange-200 bg-orange-50">
-        <AlertTriangle className="h-4 w-4 text-orange-600" />
-        <AlertDescription className="text-orange-800">
-          <strong>Important:</strong> Content is saved to your browser's storage. To keep changes permanently and sync
-          across devices, use the <strong>Export/Import</strong> feature regularly to backup your content.
+      {/* Status Alert */}
+      <Alert className="mb-6 border-green-200 bg-green-50">
+        <Globe className="h-4 w-4 text-green-600" />
+        <AlertDescription className="text-green-800">
+          <strong>Live Updates:</strong> When you save changes, they appear immediately for all students on any device
+          or network.
         </AlertDescription>
       </Alert>
 
       {saved && (
         <Alert className="mb-6">
-          <AlertDescription>✅ Content saved to browser storage!</AlertDescription>
+          <AlertDescription>✅ Content saved to database! All students will see changes immediately.</AlertDescription>
         </Alert>
       )}
 
@@ -330,10 +291,9 @@ export default function SimpleContentEditor() {
       )}
 
       <Tabs defaultValue="classes" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="classes">Class Content</TabsTrigger>
           <TabsTrigger value="announcements">Announcements</TabsTrigger>
-          <TabsTrigger value="sync">📱 Device Sync</TabsTrigger>
         </TabsList>
 
         {/* Class Content */}
@@ -513,86 +473,6 @@ export default function SimpleContentEditor() {
               </CardContent>
             </Card>
           ))}
-        </TabsContent>
-
-        {/* Device Sync */}
-        <TabsContent value="sync" className="space-y-6">
-          <Card className="border-blue-200 bg-blue-50">
-            <CardHeader>
-              <CardTitle className="text-blue-800">📱 How to Keep Your Content Permanent</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-blue-700">
-                <p>
-                  <strong>Your content is saved to your browser</strong> but may be lost if you clear browser data or
-                  after extended periods.
-                </p>
-                <p>
-                  <strong>To keep content permanently and sync across devices:</strong>
-                </p>
-                <ol className="list-decimal list-inside space-y-1 ml-4">
-                  <li>Export your content regularly (weekly recommended)</li>
-                  <li>Save the exported data to Google Drive or email it to yourself</li>
-                  <li>Import the data on other devices or after browser resets</li>
-                </ol>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Download className="h-5 w-5 mr-2" />
-                Export Content (Backup)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">Create a backup of all your content to save permanently.</p>
-              <Button onClick={handleExport} className="flex items-center">
-                <Download className="h-4 w-4 mr-2" />
-                Export Content
-              </Button>
-
-              {exportData && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Backup Data (Save this!):</label>
-                    <Button size="sm" onClick={copyToClipboard} className="flex items-center">
-                      <Copy className="h-4 w-4 mr-1" />
-                      Copy
-                    </Button>
-                  </div>
-                  <Textarea value={exportData} readOnly rows={8} className="font-mono text-xs" />
-                  <p className="text-xs text-gray-600">
-                    💡 Copy this data and save it in Google Drive, email, or a text file for backup!
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Upload className="h-5 w-5 mr-2" />
-                Import Content (Restore)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">Restore content from a backup or sync from another device.</p>
-              <Textarea
-                value={importData}
-                onChange={(e) => setImportData(e.target.value)}
-                placeholder="Paste your backup data here..."
-                rows={8}
-                className="font-mono text-xs"
-              />
-              <Button onClick={handleImport} disabled={!importData} className="flex items-center">
-                <Upload className="h-4 w-4 mr-2" />
-                Import Content
-              </Button>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>

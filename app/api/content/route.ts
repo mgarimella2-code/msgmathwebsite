@@ -1,12 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-// Since we can't write files in Vercel's serverless environment,
-// we'll use a simple in-memory store that resets on deployment
-// This is a temporary solution - in production you'd use a database
-
+// Simple in-memory storage with timestamp tracking
 let contentStore: any = null
+let lastUpdateTime: string = new Date().toISOString()
 
-// Default content with calendar support
+// Default content
 const defaultContent = {
   welcome: {
     title: "Welcome",
@@ -131,15 +129,35 @@ const defaultContent = {
   ],
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const lastUpdate = searchParams.get("lastUpdate")
+
     // Return stored content or default content
     const content = contentStore || defaultContent
+
+    // If checking for updates, compare timestamps
+    if (lastUpdate) {
+      const hasUpdates = lastUpdateTime > lastUpdate
+      return NextResponse.json({
+        hasUpdates,
+        content: hasUpdates ? content : null,
+        lastUpdate: lastUpdateTime,
+      })
+    }
+
     console.log("Returning content with classes:", Object.keys(content.classes))
-    return NextResponse.json(content)
+    return NextResponse.json({
+      ...content,
+      _lastUpdate: lastUpdateTime,
+    })
   } catch (error) {
     console.error("Error in GET /api/content:", error)
-    return NextResponse.json(defaultContent)
+    return NextResponse.json({
+      ...defaultContent,
+      _lastUpdate: lastUpdateTime,
+    })
   }
 }
 
@@ -149,13 +167,18 @@ export async function POST(request: NextRequest) {
     console.log("API: Received content to store")
     console.log("API: Classes in content:", Object.keys(newContent.classes || {}))
 
-    // Store in memory (this will reset on server restart)
+    // Store in memory and update timestamp
     contentStore = newContent
+    lastUpdateTime = new Date().toISOString()
 
     console.log("API: Successfully stored content in memory")
-    console.log("API: Stored classes:", Object.keys(contentStore.classes || {}))
+    console.log("API: Updated timestamp:", lastUpdateTime)
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      success: true,
+      message: "Content saved successfully",
+      lastUpdate: lastUpdateTime,
+    })
   } catch (error) {
     console.error("API: Error in POST /api/content:", error)
     return NextResponse.json(

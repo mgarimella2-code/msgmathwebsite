@@ -2,9 +2,9 @@
 
 import { useAdmin } from "@/contexts/admin-context"
 import AdminLogin from "@/components/admin/admin-login"
-import SimpleContentEditor from "@/components/admin/simple-content-editor"
+import UniversalContentEditor from "@/components/admin/universal-content-editor"
 import { Button } from "@/components/ui/button"
-import { LogOut } from 'lucide-react'
+import { LogOut } from "lucide-react"
 
 export default function AdminPage() {
   const { isAdmin, logout } = useAdmin()
@@ -24,7 +24,7 @@ export default function AdminPage() {
           </Button>
         </div>
       </div>
-      <SimpleContentEditor />
+      <UniversalContentEditor />
     </div>
   )
 }

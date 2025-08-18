@@ -6,6 +6,7 @@ import Link from "next/link"
 import { ExternalLink, FileText, BookOpen, PenTool, LinkIcon, RefreshCw } from "lucide-react"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { loadContentFromStorage, checkForUpdates } from "@/lib/storage"
 
 const classNames = {
   "ap-precalc": "AP PreCalc",
@@ -27,24 +28,14 @@ export default function ClassPage({ params }: { params: { slug: string } }) {
   const [content, setContent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [lastUpdate, setLastUpdate] = useState<string>("")
 
   useEffect(() => {
     loadContent()
 
-    // Listen for storage changes from admin panel
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "ms-g-website-content" && e.newValue) {
-        try {
-          const newContent = JSON.parse(e.newValue)
-          setContent(newContent)
-        } catch (err) {
-          console.warn("Failed to parse updated content:", err)
-        }
-      }
-    }
-
-    window.addEventListener("storage", handleStorageChange)
-    return () => window.removeEventListener("storage", handleStorageChange)
+    // Check for updates every 30 seconds
+    const interval = setInterval(checkForContentUpdates, 30000)
+    return () => clearInterval(interval)
   }, [])
 
   const loadContent = async () => {
@@ -54,41 +45,35 @@ export default function ClassPage({ params }: { params: { slug: string } }) {
 
       console.log("Loading content for class:", params.slug)
 
-      // Always try server first, then fall back to localStorage
-      let serverContent = null
-      try {
-        const response = await fetch("/api/content", {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-          },
-        })
-        if (response.ok) {
-          serverContent = await response.json()
-          console.log("Loaded from server, classes available:", Object.keys(serverContent.classes))
-          // Save to localStorage
-          localStorage.setItem("ms-g-website-content", JSON.stringify(serverContent))
-          setContent(serverContent)
-          return
-        }
-      } catch (serverError) {
-        console.warn("Server load failed, trying localStorage:", serverError)
-      }
+      const result = await loadContentFromStorage()
 
-      // Fallback to localStorage
-      const localContent = localStorage.getItem("ms-g-website-content")
-      if (localContent) {
-        const parsedContent = JSON.parse(localContent)
-        console.log("Loaded from localStorage, classes available:", Object.keys(parsedContent.classes))
-        setContent(parsedContent)
+      if (result.success && result.content) {
+        setContent(result.content)
+        setLastUpdate(result.content._lastUpdate || new Date().toISOString())
+        console.log(`Loaded from ${result.source}, classes available:`, Object.keys(result.content.classes))
       } else {
-        setError("No content available")
+        throw new Error(result.error || "No content available")
       }
     } catch (err) {
       setError("Failed to load content")
       console.error("Load error for class", params.slug, ":", err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const checkForContentUpdates = async () => {
+    if (!lastUpdate) return
+
+    try {
+      const result = await checkForUpdates(lastUpdate)
+      if (result.hasUpdates && result.content) {
+        setContent(result.content)
+        setLastUpdate(result.content._lastUpdate || new Date().toISOString())
+        console.log("Content updated from server")
+      }
+    } catch (err) {
+      console.warn("Failed to check for updates:", err)
     }
   }
 

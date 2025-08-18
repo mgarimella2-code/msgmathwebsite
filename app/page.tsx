@@ -3,56 +3,57 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { ExternalLink, RefreshCw } from 'lucide-react'
+import { ExternalLink, RefreshCw } from "lucide-react"
+import { loadContentFromStorage, checkForUpdates } from "@/lib/storage"
 
 export default function HomePage() {
   const [content, setContent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [lastUpdate, setLastUpdate] = useState<string>("")
 
   useEffect(() => {
     loadContent()
-    
-    // Listen for storage changes from admin panel
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'ms-g-website-content' && e.newValue) {
-        try {
-          const newContent = JSON.parse(e.newValue)
-          setContent(newContent)
-        } catch (err) {
-          console.warn('Failed to parse updated content:', err)
-        }
-      }
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
+
+    // Check for updates every 30 seconds
+    const interval = setInterval(checkForContentUpdates, 30000)
+    return () => clearInterval(interval)
   }, [])
 
   const loadContent = async () => {
     try {
       setLoading(true)
       setError("")
-      
-      // Try localStorage first
-      const localContent = localStorage.getItem('ms-g-website-content')
-      if (localContent) {
-        const parsedContent = JSON.parse(localContent)
-        setContent(parsedContent)
+
+      const result = await loadContentFromStorage()
+
+      if (result.success && result.content) {
+        setContent(result.content)
+        setLastUpdate(result.content._lastUpdate || new Date().toISOString())
+        console.log(`Loaded content from ${result.source}`)
       } else {
-        // Fallback to server
-        const response = await fetch('/api/content', { cache: 'no-store' })
-        if (response.ok) {
-          const serverContent = await response.json()
-          setContent(serverContent)
-          localStorage.setItem('ms-g-website-content', JSON.stringify(serverContent))
-        }
+        throw new Error(result.error || "Failed to load content")
       }
     } catch (err) {
       setError("Failed to load content")
       console.error("Load error:", err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const checkForContentUpdates = async () => {
+    if (!lastUpdate) return
+
+    try {
+      const result = await checkForUpdates(lastUpdate)
+      if (result.hasUpdates && result.content) {
+        setContent(result.content)
+        setLastUpdate(result.content._lastUpdate || new Date().toISOString())
+        console.log("Content updated from server")
+      }
+    } catch (err) {
+      console.warn("Failed to check for updates:", err)
     }
   }
 
@@ -90,7 +91,9 @@ export default function HomePage() {
           <CardTitle className="text-3xl font-bold text-purple-700">{welcome?.title || "Welcome"}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-lg text-gray-700 leading-relaxed">{welcome?.content || "Welcome to Ms. G's math classes!"}</p>
+          <p className="text-lg text-gray-700 leading-relaxed">
+            {welcome?.content || "Welcome to Ms. G's math classes!"}
+          </p>
         </CardContent>
       </Card>
 
@@ -154,7 +157,10 @@ export default function HomePage() {
               </h3>
               <p className="text-gray-700">
                 Feel free to email me at anytime at{" "}
-                <a href={`mailto:${contact?.email}`} className="text-blue-600 hover:text-blue-800 font-medium underline">
+                <a
+                  href={`mailto:${contact?.email}`}
+                  className="text-blue-600 hover:text-blue-800 font-medium underline"
+                >
                   {contact?.email}
                 </a>
               </p>
