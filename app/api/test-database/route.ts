@@ -2,82 +2,46 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    console.log("Testing database connection...")
+    console.log("Testing Neon database connection...")
 
-    // Check environment variables
-    const dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    // Prioritize DATABASE_URL and POSTGRES_URL (Neon) over Supabase variables
+    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
 
     console.log("Environment check:")
-    console.log("- POSTGRES_URL exists:", !!process.env.POSTGRES_URL)
     console.log("- DATABASE_URL exists:", !!process.env.DATABASE_URL)
-    console.log("- SUPABASE_URL exists:", !!supabaseUrl)
+    console.log("- POSTGRES_URL exists:", !!process.env.POSTGRES_URL)
+    console.log("- Using URL:", dbUrl ? dbUrl.substring(0, 30) + "..." : "none")
 
-    if (!dbUrl && !supabaseUrl) {
+    if (!dbUrl) {
       return NextResponse.json({
         success: false,
-        error: "No database URL found",
-        details: "Neither POSTGRES_URL nor DATABASE_URL environment variables are set",
+        error: "No Neon database URL found",
+        details: "Neither DATABASE_URL nor POSTGRES_URL environment variables are set for Neon",
+        suggestion: "Add Neon integration in Vercel dashboard or set DATABASE_URL manually",
       })
     }
 
-    // Try different connection methods
-    if (dbUrl) {
-      console.log("Trying Vercel Postgres connection...")
-      try {
-        const { sql } = await import("@vercel/postgres")
-        const result = await sql`SELECT 1 as test, NOW() as current_time`
+    console.log("Trying Neon database connection...")
+    try {
+      const { sql } = await import("@vercel/postgres")
+      const result = await sql`SELECT 1 as test, NOW() as current_time, version() as db_version`
 
-        return NextResponse.json({
-          success: true,
-          method: "vercel-postgres",
-          result: result.rows[0],
-          message: "Database connection successful!",
-        })
-      } catch (pgError) {
-        console.error("Vercel Postgres error:", pgError)
+      return NextResponse.json({
+        success: true,
+        method: "neon-postgres",
+        result: result.rows[0],
+        message: "Neon database connection successful!",
+      })
+    } catch (pgError) {
+      console.error("Neon database connection error:", pgError)
 
-        return NextResponse.json({
-          success: false,
-          error: "Vercel Postgres connection failed",
-          details: pgError instanceof Error ? pgError.message : "Unknown error",
-          suggestion: "Check if your database is running and accessible",
-        })
-      }
+      return NextResponse.json({
+        success: false,
+        error: "Neon database connection failed",
+        details: pgError instanceof Error ? pgError.message : "Unknown error",
+        suggestion: "Check if your Neon database is running and the connection string is correct",
+      })
     }
-
-    if (supabaseUrl) {
-      console.log("Trying Supabase connection...")
-      try {
-        const { createClient } = await import("@supabase/supabase-js")
-        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-
-        const { data, error } = await supabase.from("website_content").select("count").limit(1)
-
-        if (error && !error.message.includes('relation "website_content" does not exist')) {
-          throw error
-        }
-
-        return NextResponse.json({
-          success: true,
-          method: "supabase",
-          message: "Supabase connection successful!",
-        })
-      } catch (supabaseError) {
-        console.error("Supabase error:", supabaseError)
-
-        return NextResponse.json({
-          success: false,
-          error: "Supabase connection failed",
-          details: supabaseError instanceof Error ? supabaseError.message : "Unknown error",
-        })
-      }
-    }
-
-    return NextResponse.json({
-      success: false,
-      error: "No valid database configuration found",
-    })
   } catch (error) {
     console.error("Database test error:", error)
     return NextResponse.json(
