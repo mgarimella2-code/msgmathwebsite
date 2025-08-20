@@ -4,7 +4,7 @@ export async function POST() {
   try {
     console.log("Setting up database table...")
 
-    // Check for any available Neon environment variables
+    // Check for any available database environment variables
     const neonUrl =
       process.env.DATABASE_URL ||
       process.env.POSTGRES_URL ||
@@ -16,21 +16,36 @@ export async function POST() {
         {
           success: false,
           error: "Database not configured",
-          details: "No Neon database URL found in environment variables. Database features are not available.",
+          details: "No database URL found in environment variables. Database features are not available.",
         },
         { status: 400 },
       )
     }
 
-    // Try to import and use the database with explicit connection string
-    const { sql } = await import("@vercel/postgres")
-    const dbSql = sql.withConnectionString(neonUrl)
+    let sql: any
+    let isNeonServerless = false
+
+    try {
+      // Try Neon serverless first
+      const { neon } = await import("@neondatabase/serverless")
+      sql = neon(neonUrl)
+      isNeonServerless = true
+      console.log("Using Neon serverless driver")
+    } catch (neonError) {
+      console.log("Neon serverless not available, using Vercel Postgres:", neonError)
+
+      // Fallback to Vercel Postgres
+      const { sql: vercelSql } = await import("@vercel/postgres")
+      sql = vercelSql
+      isNeonServerless = false
+      console.log("Using Vercel Postgres driver")
+    }
 
     // Test connection first
-    await dbSql`SELECT 1 as test`
+    await sql`SELECT 1 as test`
 
     // Create the content table
-    await dbSql`
+    await sql`
       CREATE TABLE IF NOT EXISTS website_content (
         id INTEGER PRIMARY KEY DEFAULT 1,
         content JSONB NOT NULL,
@@ -39,12 +54,14 @@ export async function POST() {
     `
 
     // Check if we have any content
-    const existingContent = await dbSql`
+    const existingContent = await sql`
       SELECT COUNT(*) as count FROM website_content WHERE id = 1
     `
 
+    const count = isNeonServerless ? existingContent[0].count : existingContent.rows[0].count
+
     // Insert default content if table is empty
-    if (existingContent.rows[0].count === "0") {
+    if (count === 0 || count === "0") {
       const defaultContent = {
         welcome: {
           title: "Welcome",
@@ -97,7 +114,7 @@ export async function POST() {
         ],
       }
 
-      await dbSql`
+      await sql`
         INSERT INTO website_content (id, content, updated_at)
         VALUES (1, ${JSON.stringify(defaultContent)}, NOW())
       `

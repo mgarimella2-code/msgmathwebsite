@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    console.log("Testing Neon database connection...")
+    console.log("Testing database connection...")
 
     // Check for any available Neon environment variables
     const neonUrl =
@@ -21,35 +21,49 @@ export async function GET() {
     if (!neonUrl) {
       return NextResponse.json({
         success: false,
-        error: "No Neon database URL found",
+        error: "No database URL found",
         details:
-          "None of the expected Neon environment variables (DATABASE_URL, POSTGRES_URL, POSTGRES_PRISMA_URL, POSTGRES_URL_NON_POOLING) are set",
+          "None of the expected database environment variables (DATABASE_URL, POSTGRES_URL, POSTGRES_PRISMA_URL, POSTGRES_URL_NON_POOLING) are set",
         suggestion: "Add Neon integration in Vercel dashboard or set DATABASE_URL manually",
       })
     }
 
-    console.log("Trying Neon database connection with explicit connection string...")
+    console.log("Trying database connection...")
     try {
-      const { sql } = await import("@vercel/postgres")
+      // Try Neon serverless first
+      try {
+        const { neon } = await import("@neondatabase/serverless")
+        const sql = neon(neonUrl)
+        const result = await sql`SELECT 1 as test, NOW() as current_time, version() as db_version`
 
-      // Use explicit connection string
-      const dbSql = sql.withConnectionString(neonUrl)
-      const result = await dbSql`SELECT 1 as test, NOW() as current_time, version() as db_version`
+        return NextResponse.json({
+          success: true,
+          method: "neon-serverless",
+          result: result[0],
+          message: "Neon serverless connection successful!",
+        })
+      } catch (neonError) {
+        console.log("Neon serverless failed, trying Vercel Postgres:", neonError)
 
-      return NextResponse.json({
-        success: true,
-        method: "neon-postgres",
-        result: result.rows[0],
-        message: "Neon database connection successful!",
-      })
+        // Fallback to Vercel Postgres
+        const { sql } = await import("@vercel/postgres")
+        const result = await sql`SELECT 1 as test, NOW() as current_time, version() as db_version`
+
+        return NextResponse.json({
+          success: true,
+          method: "vercel-postgres",
+          result: result.rows[0],
+          message: "Vercel Postgres connection successful!",
+        })
+      }
     } catch (pgError) {
-      console.error("Neon database connection error:", pgError)
+      console.error("Database connection error:", pgError)
 
       return NextResponse.json({
         success: false,
-        error: "Neon database connection failed",
+        error: "Database connection failed",
         details: pgError instanceof Error ? pgError.message : "Unknown error",
-        suggestion: "Check if your Neon database is running and the connection string is correct",
+        suggestion: "Check if your database is running and the connection string is correct",
       })
     }
   } catch (error) {

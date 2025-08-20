@@ -1,4 +1,4 @@
-// Database connection with proper error handling - prioritizes Neon over Supabase
+// Database connection with proper Neon setup
 let hasDatabase = false
 
 // Check if database is available
@@ -24,15 +24,22 @@ async function checkDatabaseAvailability() {
 
     console.log("Using database URL:", neonUrl.substring(0, 20) + "...")
 
-    // Try to import and use the database with explicit connection string
-    const { sql } = await import("@vercel/postgres")
+    // Try using Neon's serverless driver
+    try {
+      const { neon } = await import("@neondatabase/serverless")
+      const sql = neon(neonUrl)
+      await sql`SELECT 1 as test`
+      console.log("Neon serverless connection successful")
+      return true
+    } catch (neonError) {
+      console.log("Neon serverless failed, trying Vercel Postgres:", neonError)
 
-    // Test connection with explicit connection string
-    const testSql = sql.withConnectionString(neonUrl)
-    await testSql`SELECT 1 as test`
-
-    console.log("Neon database connection successful")
-    return true
+      // Fallback to Vercel Postgres
+      const { sql } = await import("@vercel/postgres")
+      await sql`SELECT 1 as test`
+      console.log("Vercel Postgres connection successful")
+      return true
+    }
   } catch (error) {
     console.log("Database not available:", error instanceof Error ? error.message : "Unknown error")
     return false
@@ -44,11 +51,11 @@ export async function saveContentToDatabase(content: any) {
     if (!hasDatabase) {
       hasDatabase = await checkDatabaseAvailability()
       if (!hasDatabase) {
-        return { success: false, error: "Neon database not configured" }
+        return { success: false, error: "Database not configured" }
       }
     }
 
-    console.log("Saving content to Neon database...")
+    console.log("Saving content to database...")
 
     // Get the connection string
     const neonUrl =
@@ -61,26 +68,44 @@ export async function saveContentToDatabase(content: any) {
       return { success: false, error: "No database connection string found" }
     }
 
-    const { sql } = await import("@vercel/postgres")
-    const dbSql = sql.withConnectionString(neonUrl)
+    let result
+    try {
+      // Try Neon serverless first
+      const { neon } = await import("@neondatabase/serverless")
+      const sql = neon(neonUrl)
 
-    const result = await dbSql`
-      INSERT INTO website_content (id, content, updated_at)
-      VALUES (1, ${JSON.stringify(content)}, NOW())
-      ON CONFLICT (id) 
-      DO UPDATE SET 
-        content = ${JSON.stringify(content)},
-        updated_at = NOW()
-      RETURNING updated_at
-    `
+      result = await sql`
+        INSERT INTO website_content (id, content, updated_at)
+        VALUES (1, ${JSON.stringify(content)}, NOW())
+        ON CONFLICT (id) 
+        DO UPDATE SET 
+          content = ${JSON.stringify(content)},
+          updated_at = NOW()
+        RETURNING updated_at
+      `
+    } catch (neonError) {
+      console.log("Neon save failed, trying Vercel Postgres:", neonError)
 
-    console.log("Content saved to Neon database successfully")
+      // Fallback to Vercel Postgres
+      const { sql } = await import("@vercel/postgres")
+      result = await sql`
+        INSERT INTO website_content (id, content, updated_at)
+        VALUES (1, ${JSON.stringify(content)}, NOW())
+        ON CONFLICT (id) 
+        DO UPDATE SET 
+          content = ${JSON.stringify(content)},
+          updated_at = NOW()
+        RETURNING updated_at
+      `
+    }
+
+    console.log("Content saved to database successfully")
     return {
       success: true,
-      timestamp: result.rows[0]?.updated_at || new Date().toISOString(),
+      timestamp: result[0]?.updated_at || new Date().toISOString(),
     }
   } catch (error) {
-    console.error("Neon database save error:", error)
+    console.error("Database save error:", error)
     hasDatabase = false // Reset flag on error
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
@@ -91,11 +116,11 @@ export async function loadContentFromDatabase() {
     if (!hasDatabase) {
       hasDatabase = await checkDatabaseAvailability()
       if (!hasDatabase) {
-        return { success: false, error: "Neon database not configured" }
+        return { success: false, error: "Database not configured" }
       }
     }
 
-    console.log("Loading content from Neon database...")
+    console.log("Loading content from database...")
 
     // Get the connection string
     const neonUrl =
@@ -108,18 +133,32 @@ export async function loadContentFromDatabase() {
       return { success: false, error: "No database connection string found" }
     }
 
-    const { sql } = await import("@vercel/postgres")
-    const dbSql = sql.withConnectionString(neonUrl)
+    let result
+    try {
+      // Try Neon serverless first
+      const { neon } = await import("@neondatabase/serverless")
+      const sql = neon(neonUrl)
 
-    const result = await dbSql`
-      SELECT content, updated_at 
-      FROM website_content 
-      WHERE id = 1
-    `
+      result = await sql`
+        SELECT content, updated_at 
+        FROM website_content 
+        WHERE id = 1
+      `
+    } catch (neonError) {
+      console.log("Neon load failed, trying Vercel Postgres:", neonError)
 
-    if (result.rows.length > 0) {
-      const row = result.rows[0]
-      console.log("Content loaded from Neon database successfully")
+      // Fallback to Vercel Postgres
+      const { sql } = await import("@vercel/postgres")
+      result = await sql`
+        SELECT content, updated_at 
+        FROM website_content 
+        WHERE id = 1
+      `
+    }
+
+    if (result.length > 0) {
+      const row = result[0]
+      console.log("Content loaded from database successfully")
       return {
         success: true,
         content: {
@@ -128,11 +167,11 @@ export async function loadContentFromDatabase() {
         },
       }
     } else {
-      console.log("No content found in Neon database")
+      console.log("No content found in database")
       return { success: false, error: "No content found" }
     }
   } catch (error) {
-    console.error("Neon database load error:", error)
+    console.error("Database load error:", error)
     hasDatabase = false // Reset flag on error
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
@@ -160,17 +199,31 @@ export async function checkDatabaseForUpdates(lastUpdateTime?: string) {
       return { hasUpdates: false }
     }
 
-    const { sql } = await import("@vercel/postgres")
-    const dbSql = sql.withConnectionString(neonUrl)
+    let result
+    try {
+      // Try Neon serverless first
+      const { neon } = await import("@neondatabase/serverless")
+      const sql = neon(neonUrl)
 
-    const result = await dbSql`
-      SELECT updated_at, content
-      FROM website_content 
-      WHERE id = 1 AND updated_at > ${lastUpdateTime}
-    `
+      result = await sql`
+        SELECT updated_at, content
+        FROM website_content 
+        WHERE id = 1 AND updated_at > ${lastUpdateTime}
+      `
+    } catch (neonError) {
+      console.log("Neon update check failed, trying Vercel Postgres:", neonError)
 
-    if (result.rows.length > 0) {
-      const row = result.rows[0]
+      // Fallback to Vercel Postgres
+      const { sql } = await import("@vercel/postgres")
+      result = await sql`
+        SELECT updated_at, content
+        FROM website_content 
+        WHERE id = 1 AND updated_at > ${lastUpdateTime}
+      `
+    }
+
+    if (result.length > 0) {
+      const row = result[0]
       return {
         hasUpdates: true,
         content: {
@@ -182,7 +235,7 @@ export async function checkDatabaseForUpdates(lastUpdateTime?: string) {
 
     return { hasUpdates: false }
   } catch (error) {
-    console.error("Neon database update check error:", error)
+    console.error("Database update check error:", error)
     hasDatabase = false // Reset flag on error
     return { hasUpdates: false }
   }
@@ -194,12 +247,12 @@ export async function testDatabaseConnection() {
     const isAvailable = await checkDatabaseAvailability()
     if (isAvailable) {
       hasDatabase = true
-      return { success: true, message: "Neon database connection successful" }
+      return { success: true, message: "Database connection successful" }
     } else {
-      return { success: false, error: "Neon database not configured or unavailable" }
+      return { success: false, error: "Database not configured or unavailable" }
     }
   } catch (error) {
-    console.error("Neon database connection test failed:", error)
+    console.error("Database connection test failed:", error)
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }
