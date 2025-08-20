@@ -14,7 +14,10 @@ export async function saveContentToStorage(content: any) {
       console.log("💾 Trying database via API...")
       const response = await fetch("/api/save-content", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
         body: JSON.stringify(content),
       })
 
@@ -22,6 +25,12 @@ export async function saveContentToStorage(content: any) {
         const result = await response.json()
         if (result.success) {
           console.log("✅ SUCCESS: Content saved to database (permanent)")
+
+          // Clear localStorage on other devices by setting a sync flag
+          if (typeof window !== "undefined") {
+            localStorage.setItem("ms-g-last-save", Date.now().toString())
+          }
+
           return { success: true, source: "database", permanent: true }
         } else {
           console.log("❌ Database save failed via API:", result.error)
@@ -69,21 +78,27 @@ export async function loadContentFromStorage() {
   try {
     console.log("🔍 Loading content from storage...")
 
-    // Try database via API route first
+    // Try database via API route first with cache busting
     try {
       console.log("📖 Trying database via API...")
-      const response = await fetch("/api/load-content", {
+      const response = await fetch(`/api/load-content?t=${Date.now()}`, {
         cache: "no-store",
-        headers: { "Cache-Control": "no-cache" },
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
       })
 
       if (response.ok) {
         const result = await response.json()
         if (result.success && result.content) {
           console.log("✅ SUCCESS: Loaded content from database (permanent)")
+          console.log("📊 Content loaded at:", result.content._loadedAt)
+
           // Update localStorage with database content
           if (typeof window !== "undefined") {
             localStorage.setItem("ms-g-website-content", JSON.stringify(result.content))
+            localStorage.setItem("ms-g-last-load", Date.now().toString())
           }
           return { success: true, content: result.content, source: "database" }
         } else {
@@ -99,7 +114,7 @@ export async function loadContentFromStorage() {
     // Fallback to server API
     try {
       console.log("📖 Trying server API...")
-      const response = await fetch(API_BASE, {
+      const response = await fetch(`${API_BASE}?t=${Date.now()}`, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
       })
@@ -124,6 +139,7 @@ export async function loadContentFromStorage() {
       if (localContent) {
         const parsedContent = JSON.parse(localContent)
         console.log("✅ SUCCESS: Loaded content from localStorage (browser only)")
+        console.log("⚠️ WARNING: This device is not syncing with database!")
         return { success: true, content: parsedContent, source: "localStorage" }
       }
     }
@@ -137,11 +153,12 @@ export async function loadContentFromStorage() {
 
 export async function checkForUpdates(lastUpdateTime?: string) {
   try {
-    // Check database via API first
+    // Check database via API first with cache busting
     try {
       console.log("🔄 Checking database for updates via API...")
-      const response = await fetch(`/api/check-updates?lastUpdate=${lastUpdateTime || ""}`, {
+      const response = await fetch(`/api/check-updates?lastUpdate=${lastUpdateTime || ""}&t=${Date.now()}`, {
         cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
       })
 
       if (response.ok) {
@@ -158,7 +175,7 @@ export async function checkForUpdates(lastUpdateTime?: string) {
     // Fallback to server check
     try {
       console.log("🔄 Checking server for updates...")
-      const response = await fetch(`${API_BASE}?lastUpdate=${lastUpdateTime || ""}`, {
+      const response = await fetch(`${API_BASE}?lastUpdate=${lastUpdateTime || ""}&t=${Date.now()}`, {
         cache: "no-store",
       })
 

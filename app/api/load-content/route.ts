@@ -9,10 +9,27 @@ export async function GET() {
 
     if (result.success && result.content) {
       console.log("✅ API: Database load successful")
-      return NextResponse.json({
-        success: true,
-        content: result.content,
-      })
+
+      // Add timestamp to force cache invalidation
+      const contentWithTimestamp = {
+        ...result.content,
+        _loadedAt: new Date().toISOString(),
+        _cacheBreaker: Date.now(),
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          content: contentWithTimestamp,
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        },
+      )
     } else {
       console.log("❌ API: Database load failed:", result.error)
       return NextResponse.json(

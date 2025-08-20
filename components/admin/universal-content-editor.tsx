@@ -23,6 +23,7 @@ import {
   Clock,
   CheckCircle,
   Settings,
+  Bug,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { saveContentToStorage, loadContentFromStorage, checkForUpdates } from "@/lib/storage"
@@ -55,6 +56,7 @@ export default function UniversalContentEditor() {
   const [lastUpdate, setLastUpdate] = useState<string>("")
   const [storageType, setStorageType] = useState<string>("unknown")
   const [isPermanent, setIsPermanent] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   useEffect(() => {
     loadContent()
@@ -81,7 +83,7 @@ export default function UniversalContentEditor() {
       setLoading(true)
       setError("")
 
-      console.log("Loading content...")
+      console.log("🔍 Loading content...")
       const result = await loadContentFromStorage()
 
       if (result.success && result.content) {
@@ -89,19 +91,16 @@ export default function UniversalContentEditor() {
         setLastUpdate(result.content._lastUpdate || new Date().toISOString())
         setStorageType(result.source)
         setIsPermanent(result.source === "database")
-        console.log(`Loaded content from ${result.source}`)
+        console.log(`✅ Loaded content from ${result.source}`)
 
-        // Force permanent detection if content persists (which you confirmed it does)
-        console.log("🔍 Storage detection result:", {
-          source: result.source,
-          isPermanent: result.source === "database",
-          content: !!result.content,
+        // Store debug info
+        setDebugInfo({
+          loadedFrom: result.source,
+          loadedAt: new Date().toISOString(),
+          contentKeys: Object.keys(result.content),
+          announcementCount: result.content.announcements?.length || 0,
+          classCount: Object.keys(result.content.classes || {}).length,
         })
-
-        // Test: if we can load content, assume database is working since you confirmed persistence
-        setIsPermanent(true)
-        setStorageType("database")
-        console.log("✅ Forcing permanent storage detection since persistence is confirmed")
       } else {
         throw new Error(result.error || "Failed to load content")
       }
@@ -133,16 +132,24 @@ export default function UniversalContentEditor() {
       setSaving(true)
       setError("")
 
-      console.log("Saving content...")
+      console.log("💾 Saving content...")
       const result = await saveContentToStorage(newContent)
 
       if (result.success) {
-        console.log(`Content saved to ${result.source}`)
+        console.log(`✅ Content saved to ${result.source}`)
         setLastUpdate(new Date().toISOString())
         setStorageType(result.source)
         setIsPermanent(result.permanent || false)
         setSaved(true)
         setTimeout(() => setSaved(false), 3000)
+
+        // Update debug info
+        setDebugInfo({
+          ...debugInfo,
+          lastSavedTo: result.source,
+          lastSavedAt: new Date().toISOString(),
+          isPermanent: result.permanent,
+        })
       } else {
         throw new Error("Failed to save content")
       }
@@ -151,6 +158,51 @@ export default function UniversalContentEditor() {
       console.error("Save error:", err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const testDatabaseDirectly = async () => {
+    try {
+      console.log("🧪 Testing database directly...")
+
+      // Test save
+      const testContent = {
+        ...content,
+        _testSave: new Date().toISOString(),
+        _testId: Math.random().toString(36).substr(2, 9),
+      }
+
+      const saveResponse = await fetch("/api/save-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testContent),
+      })
+
+      const saveResult = await saveResponse.json()
+      console.log("🧪 Save test result:", saveResult)
+
+      // Test load immediately after
+      const loadResponse = await fetch(`/api/load-content?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      })
+
+      const loadResult = await loadResponse.json()
+      console.log("🧪 Load test result:", loadResult)
+
+      // Check if the test data matches
+      const matches = loadResult.content?._testId === testContent._testId
+      console.log("🧪 Data matches:", matches)
+
+      alert(`Database Test Results:
+Save: ${saveResult.success ? "✅ SUCCESS" : "❌ FAILED"}
+Load: ${loadResult.success ? "✅ SUCCESS" : "❌ FAILED"}
+Data Match: ${matches ? "✅ YES" : "❌ NO"}
+
+${matches ? "Database is working!" : "Database has issues!"}`)
+    } catch (error) {
+      console.error("🧪 Database test failed:", error)
+      alert(`Database test failed: ${error}`)
     }
   }
 
@@ -337,12 +389,44 @@ export default function UniversalContentEditor() {
               </span>
             </div>
           </div>
-          <Button onClick={loadContent} variant="outline" className="flex items-center bg-transparent">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={testDatabaseDirectly} variant="outline" className="flex items-center bg-yellow-50">
+              <Bug className="h-4 w-4 mr-2" />🧪 Test Database
+            </Button>
+            <Button onClick={loadContent} variant="outline" className="flex items-center bg-transparent">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Debug Info */}
+      {debugInfo && (
+        <Alert className="mb-6 border-blue-200 bg-blue-50">
+          <Bug className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>🔍 Debug Info:</strong>
+            <div className="text-sm mt-1 space-y-1">
+              <div>
+                📖 Loaded from: <strong>{debugInfo.loadedFrom}</strong>
+              </div>
+              <div>
+                💾 Last saved to: <strong>{debugInfo.lastSavedTo || "Not saved yet"}</strong>
+              </div>
+              <div>
+                📊 Announcements: <strong>{debugInfo.announcementCount}</strong>
+              </div>
+              <div>
+                🏫 Classes: <strong>{debugInfo.classCount}</strong>
+              </div>
+              <div>
+                🕐 Loaded at: <strong>{debugInfo.loadedAt}</strong>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Storage Status Alert */}
       {isPermanent ? (
