@@ -46,21 +46,25 @@ export async function GET() {
         ORDER BY updated_at DESC
       `
 
-      // Get row count
+      // Get row count - FIX THE BUG HERE
       const countResult = await sql`
         SELECT COUNT(*) as total_rows FROM website_content
       `
+
+      // Get the actual content to see what's there
+      const actualContent = contentResult.length > 0 ? contentResult[0].content : null
 
       return NextResponse.json({
         success: true,
         method: "neon-serverless",
         debug: {
           tableExists: tableCheck[0].table_exists,
-          totalRows: countResult[0].count,
+          totalRows: Number.parseInt(countResult[0].count) || contentResult.length, // Fix: use count properly
           contentSize: contentResult[0]?.content_size || 0,
           lastUpdate: contentResult[0]?.updated_at || null,
           hasContent: contentResult.length > 0,
-          contentPreview: contentResult[0]?.content ? Object.keys(contentResult[0].content) : [],
+          contentPreview: actualContent ? Object.keys(actualContent) : [],
+          actualRowCount: contentResult.length, // Add this for comparison
         },
         rawData: contentResult.map((row) => ({
           id: row.id,
@@ -68,6 +72,8 @@ export async function GET() {
           content_size: row.content_size,
           content_keys: row.content ? Object.keys(row.content) : [],
         })),
+        // Add the actual content so we can see what's stored
+        actualContent: actualContent,
       })
     } catch (neonError) {
       console.log("Neon failed, trying Vercel Postgres:", neonError)
@@ -96,16 +102,20 @@ export async function GET() {
         SELECT COUNT(*) as total_rows FROM website_content
       `
 
+      // Get the actual content to see what's there
+      const actualContent = contentResult.rows.length > 0 ? contentResult.rows[0].content : null
+
       return NextResponse.json({
         success: true,
         method: "vercel-postgres",
         debug: {
           tableExists: tableCheck.rows[0].table_exists,
-          totalRows: countResult.rows[0].total_rows,
+          totalRows: Number.parseInt(countResult.rows[0].total_rows) || contentResult.rows.length,
           contentSize: contentResult.rows[0]?.content_size || 0,
           lastUpdate: contentResult.rows[0]?.updated_at || null,
           hasContent: contentResult.rows.length > 0,
-          contentPreview: contentResult.rows[0]?.content ? Object.keys(contentResult.rows[0].content) : [],
+          contentPreview: actualContent ? Object.keys(actualContent) : [],
+          actualRowCount: contentResult.rows.length,
         },
         rawData: contentResult.rows.map((row) => ({
           id: row.id,
@@ -113,6 +123,7 @@ export async function GET() {
           content_size: row.content_size,
           content_keys: row.content ? Object.keys(row.content) : [],
         })),
+        actualContent: actualContent,
       })
     }
   } catch (error) {

@@ -1,4 +1,4 @@
-// Database connection with proper Neon setup
+// Database connection with proper Neon setup - FIXED VERSION
 let hasDatabase = false
 
 // Check if database is available
@@ -55,7 +55,8 @@ export async function saveContentToDatabase(content: any) {
       }
     }
 
-    console.log("Saving content to database...")
+    console.log("💾 Saving content to database...")
+    console.log("💾 Content keys:", Object.keys(content))
 
     // Get the connection string
     const neonUrl =
@@ -74,17 +75,20 @@ export async function saveContentToDatabase(content: any) {
       const { neon } = await import("@neondatabase/serverless")
       const sql = neon(neonUrl)
 
+      // FIXED: Use proper UPSERT syntax
       result = await sql`
         INSERT INTO website_content (id, content, updated_at)
         VALUES (1, ${JSON.stringify(content)}, NOW())
         ON CONFLICT (id) 
         DO UPDATE SET 
-          content = ${JSON.stringify(content)},
-          updated_at = NOW()
-        RETURNING updated_at
+          content = EXCLUDED.content,
+          updated_at = EXCLUDED.updated_at
+        RETURNING updated_at, id
       `
+
+      console.log("✅ Neon save result:", result)
     } catch (neonError) {
-      console.log("Neon save failed, trying Vercel Postgres:", neonError)
+      console.log("❌ Neon save failed, trying Vercel Postgres:", neonError)
 
       // Fallback to Vercel Postgres
       const { sql } = await import("@vercel/postgres")
@@ -93,19 +97,21 @@ export async function saveContentToDatabase(content: any) {
         VALUES (1, ${JSON.stringify(content)}, NOW())
         ON CONFLICT (id) 
         DO UPDATE SET 
-          content = ${JSON.stringify(content)},
-          updated_at = NOW()
-        RETURNING updated_at
+          content = EXCLUDED.content,
+          updated_at = EXCLUDED.updated_at
+        RETURNING updated_at, id
       `
+
+      console.log("✅ Vercel Postgres save result:", result.rows)
     }
 
-    console.log("Content saved to database successfully")
+    console.log("✅ Content saved to database successfully")
     return {
       success: true,
-      timestamp: result[0]?.updated_at || new Date().toISOString(),
+      timestamp: result[0]?.updated_at || result.rows?.[0]?.updated_at || new Date().toISOString(),
     }
   } catch (error) {
-    console.error("Database save error:", error)
+    console.error("💥 Database save error:", error)
     hasDatabase = false // Reset flag on error
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
@@ -120,7 +126,7 @@ export async function loadContentFromDatabase() {
       }
     }
 
-    console.log("Loading content from database...")
+    console.log("📖 Loading content from database...")
 
     // Get the connection string
     const neonUrl =
@@ -143,9 +149,13 @@ export async function loadContentFromDatabase() {
         SELECT content, updated_at 
         FROM website_content 
         WHERE id = 1
+        ORDER BY updated_at DESC
+        LIMIT 1
       `
+
+      console.log("📖 Neon load result:", result.length, "rows")
     } catch (neonError) {
-      console.log("Neon load failed, trying Vercel Postgres:", neonError)
+      console.log("❌ Neon load failed, trying Vercel Postgres:", neonError)
 
       // Fallback to Vercel Postgres
       const { sql } = await import("@vercel/postgres")
@@ -153,12 +163,18 @@ export async function loadContentFromDatabase() {
         SELECT content, updated_at 
         FROM website_content 
         WHERE id = 1
+        ORDER BY updated_at DESC
+        LIMIT 1
       `
+
+      console.log("📖 Vercel Postgres load result:", result.rows.length, "rows")
+      result = result.rows // Normalize for Vercel Postgres
     }
 
     if (result.length > 0) {
       const row = result[0]
-      console.log("Content loaded from database successfully")
+      console.log("✅ Content loaded from database successfully")
+      console.log("✅ Content keys:", Object.keys(row.content))
       return {
         success: true,
         content: {
@@ -167,11 +183,11 @@ export async function loadContentFromDatabase() {
         },
       }
     } else {
-      console.log("No content found in database")
+      console.log("❌ No content found in database")
       return { success: false, error: "No content found" }
     }
   } catch (error) {
-    console.error("Database load error:", error)
+    console.error("💥 Database load error:", error)
     hasDatabase = false // Reset flag on error
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
@@ -209,6 +225,8 @@ export async function checkDatabaseForUpdates(lastUpdateTime?: string) {
         SELECT updated_at, content
         FROM website_content 
         WHERE id = 1 AND updated_at > ${lastUpdateTime}
+        ORDER BY updated_at DESC
+        LIMIT 1
       `
     } catch (neonError) {
       console.log("Neon update check failed, trying Vercel Postgres:", neonError)
@@ -219,7 +237,10 @@ export async function checkDatabaseForUpdates(lastUpdateTime?: string) {
         SELECT updated_at, content
         FROM website_content 
         WHERE id = 1 AND updated_at > ${lastUpdateTime}
+        ORDER BY updated_at DESC
+        LIMIT 1
       `
+      result = result.rows // Normalize for Vercel Postgres
     }
 
     if (result.length > 0) {
