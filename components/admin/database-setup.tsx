@@ -13,6 +13,8 @@ export default function DatabaseSetup() {
   const [testResult, setTestResult] = useState<any>(null)
   const [error, setError] = useState("")
   const [hasDatabase, setHasDatabase] = useState<boolean | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [debugging, setDebugging] = useState(false)
 
   useEffect(() => {
     checkDatabaseStatus()
@@ -95,6 +97,38 @@ export default function DatabaseSetup() {
     }
   }
 
+  const debugDatabase = async () => {
+    try {
+      setDebugging(true)
+      setDebugInfo(null)
+      setError("")
+
+      console.log("🔍 Debugging database contents...")
+
+      const response = await fetch("/api/debug-database", {
+        method: "GET",
+      })
+
+      const data = await response.json()
+      setDebugInfo(data)
+
+      if (data.success) {
+        console.log("✅ Database debug successful:", data)
+      } else {
+        console.error("❌ Database debug failed:", data.error)
+      }
+    } catch (err) {
+      console.error("💥 Database debug error:", err)
+      setDebugInfo({
+        success: false,
+        error: "Debug request failed",
+        details: err instanceof Error ? err.message : "Unknown error",
+      })
+    } finally {
+      setDebugging(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card className="border-blue-200">
@@ -159,6 +193,82 @@ export default function DatabaseSetup() {
                       <span className="text-sm font-medium">💡 {testResult.suggestion}</span>
                     </>
                   )}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          {/* Debug Database Contents */}
+          <div className="space-y-3">
+            <Button
+              onClick={debugDatabase}
+              disabled={debugging}
+              variant="outline"
+              className="w-full flex items-center justify-center bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100"
+            >
+              {debugging ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Checking database contents...
+                </>
+              ) : (
+                <>
+                  <Database className="h-4 w-4 mr-2" />🔍 Debug: What's Actually in Database?
+                </>
+              )}
+            </Button>
+
+            {debugInfo && (
+              <Alert className={debugInfo.success ? "border-blue-200 bg-blue-50" : "border-red-200 bg-red-50"}>
+                <AlertDescription className={debugInfo.success ? "text-blue-800" : "text-red-800"}>
+                  <div className="space-y-2">
+                    <div className="font-semibold">
+                      {debugInfo.success ? "🔍 Database Debug Results:" : "❌ Debug Failed:"}
+                    </div>
+
+                    {debugInfo.success ? (
+                      <div className="text-sm space-y-1">
+                        <div>
+                          📊 <strong>Table exists:</strong> {debugInfo.debug?.tableExists ? "✅ Yes" : "❌ No"}
+                        </div>
+                        <div>
+                          📝 <strong>Total rows:</strong> {debugInfo.debug?.totalRows || 0}
+                        </div>
+                        <div>
+                          📏 <strong>Content size:</strong> {debugInfo.debug?.contentSize || 0} bytes
+                        </div>
+                        <div>
+                          🕐 <strong>Last update:</strong> {debugInfo.debug?.lastUpdate || "Never"}
+                        </div>
+                        <div>
+                          🔑 <strong>Content sections:</strong> {debugInfo.debug?.contentPreview?.join(", ") || "None"}
+                        </div>
+                        <div>
+                          💾 <strong>Has content:</strong> {debugInfo.debug?.hasContent ? "✅ Yes" : "❌ Empty"}
+                        </div>
+
+                        {debugInfo.rawData && debugInfo.rawData.length > 0 && (
+                          <details className="mt-2">
+                            <summary className="cursor-pointer font-medium">📋 Raw Database Data</summary>
+                            <pre className="mt-1 text-xs bg-gray-100 p-2 rounded overflow-auto">
+                              {JSON.stringify(debugInfo.rawData, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-sm">
+                        <div>
+                          <strong>Error:</strong> {debugInfo.error}
+                        </div>
+                        {debugInfo.details && (
+                          <div>
+                            <strong>Details:</strong> {debugInfo.details}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </AlertDescription>
               </Alert>
             )}
