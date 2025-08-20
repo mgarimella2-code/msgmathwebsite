@@ -4,19 +4,33 @@ let hasDatabase = false
 // Check if database is available
 async function checkDatabaseAvailability() {
   try {
-    // Prioritize DATABASE_URL and POSTGRES_URL (Neon) over Supabase
-    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+    // Check for Neon environment variables first
+    const neonUrl =
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL_NON_POOLING
 
-    if (!dbUrl) {
-      console.log("No Neon database URL found - database features disabled")
+    if (!neonUrl) {
+      console.log("No Neon database URL found - checking available env vars...")
+      console.log("Available DB env vars:", {
+        DATABASE_URL: !!process.env.DATABASE_URL,
+        POSTGRES_URL: !!process.env.POSTGRES_URL,
+        POSTGRES_PRISMA_URL: !!process.env.POSTGRES_PRISMA_URL,
+        POSTGRES_URL_NON_POOLING: !!process.env.POSTGRES_URL_NON_POOLING,
+      })
       return false
     }
 
-    console.log("Using database URL:", dbUrl.substring(0, 20) + "...")
+    console.log("Using database URL:", neonUrl.substring(0, 20) + "...")
 
-    // Try to import and use the database
+    // Try to import and use the database with explicit connection string
     const { sql } = await import("@vercel/postgres")
-    await sql`SELECT 1 as test`
+
+    // Test connection with explicit connection string
+    const testSql = sql.withConnectionString(neonUrl)
+    await testSql`SELECT 1 as test`
+
     console.log("Neon database connection successful")
     return true
   } catch (error) {
@@ -35,9 +49,22 @@ export async function saveContentToDatabase(content: any) {
     }
 
     console.log("Saving content to Neon database...")
-    const { sql } = await import("@vercel/postgres")
 
-    const result = await sql`
+    // Get the connection string
+    const neonUrl =
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL_NON_POOLING
+
+    if (!neonUrl) {
+      return { success: false, error: "No database connection string found" }
+    }
+
+    const { sql } = await import("@vercel/postgres")
+    const dbSql = sql.withConnectionString(neonUrl)
+
+    const result = await dbSql`
       INSERT INTO website_content (id, content, updated_at)
       VALUES (1, ${JSON.stringify(content)}, NOW())
       ON CONFLICT (id) 
@@ -69,9 +96,22 @@ export async function loadContentFromDatabase() {
     }
 
     console.log("Loading content from Neon database...")
-    const { sql } = await import("@vercel/postgres")
 
-    const result = await sql`
+    // Get the connection string
+    const neonUrl =
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL_NON_POOLING
+
+    if (!neonUrl) {
+      return { success: false, error: "No database connection string found" }
+    }
+
+    const { sql } = await import("@vercel/postgres")
+    const dbSql = sql.withConnectionString(neonUrl)
+
+    const result = await dbSql`
       SELECT content, updated_at 
       FROM website_content 
       WHERE id = 1
@@ -109,8 +149,21 @@ export async function checkDatabaseForUpdates(lastUpdateTime?: string) {
 
     if (!lastUpdateTime) return { hasUpdates: true }
 
+    // Get the connection string
+    const neonUrl =
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL_NON_POOLING
+
+    if (!neonUrl) {
+      return { hasUpdates: false }
+    }
+
     const { sql } = await import("@vercel/postgres")
-    const result = await sql`
+    const dbSql = sql.withConnectionString(neonUrl)
+
+    const result = await dbSql`
       SELECT updated_at, content
       FROM website_content 
       WHERE id = 1 AND updated_at > ${lastUpdateTime}

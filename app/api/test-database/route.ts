@@ -4,27 +4,37 @@ export async function GET() {
   try {
     console.log("Testing Neon database connection...")
 
-    // Prioritize DATABASE_URL and POSTGRES_URL (Neon) over Supabase variables
-    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+    // Check for any available Neon environment variables
+    const neonUrl =
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL_NON_POOLING
 
     console.log("Environment check:")
     console.log("- DATABASE_URL exists:", !!process.env.DATABASE_URL)
     console.log("- POSTGRES_URL exists:", !!process.env.POSTGRES_URL)
-    console.log("- Using URL:", dbUrl ? dbUrl.substring(0, 30) + "..." : "none")
+    console.log("- POSTGRES_PRISMA_URL exists:", !!process.env.POSTGRES_PRISMA_URL)
+    console.log("- POSTGRES_URL_NON_POOLING exists:", !!process.env.POSTGRES_URL_NON_POOLING)
+    console.log("- Using URL:", neonUrl ? neonUrl.substring(0, 30) + "..." : "none")
 
-    if (!dbUrl) {
+    if (!neonUrl) {
       return NextResponse.json({
         success: false,
         error: "No Neon database URL found",
-        details: "Neither DATABASE_URL nor POSTGRES_URL environment variables are set for Neon",
+        details:
+          "None of the expected Neon environment variables (DATABASE_URL, POSTGRES_URL, POSTGRES_PRISMA_URL, POSTGRES_URL_NON_POOLING) are set",
         suggestion: "Add Neon integration in Vercel dashboard or set DATABASE_URL manually",
       })
     }
 
-    console.log("Trying Neon database connection...")
+    console.log("Trying Neon database connection with explicit connection string...")
     try {
       const { sql } = await import("@vercel/postgres")
-      const result = await sql`SELECT 1 as test, NOW() as current_time, version() as db_version`
+
+      // Use explicit connection string
+      const dbSql = sql.withConnectionString(neonUrl)
+      const result = await dbSql`SELECT 1 as test, NOW() as current_time, version() as db_version`
 
       return NextResponse.json({
         success: true,

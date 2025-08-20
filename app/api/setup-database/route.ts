@@ -4,26 +4,33 @@ export async function POST() {
   try {
     console.log("Setting up database table...")
 
-    // Check if database is available
-    if (!process.env.POSTGRES_URL && !process.env.DATABASE_URL) {
+    // Check for any available Neon environment variables
+    const neonUrl =
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL_NON_POOLING
+
+    if (!neonUrl) {
       return NextResponse.json(
         {
           success: false,
           error: "Database not configured",
-          details: "No POSTGRES_URL or DATABASE_URL environment variable found. Database features are not available.",
+          details: "No Neon database URL found in environment variables. Database features are not available.",
         },
         { status: 400 },
       )
     }
 
-    // Try to import and use the database
+    // Try to import and use the database with explicit connection string
     const { sql } = await import("@vercel/postgres")
+    const dbSql = sql.withConnectionString(neonUrl)
 
     // Test connection first
-    await sql`SELECT 1 as test`
+    await dbSql`SELECT 1 as test`
 
     // Create the content table
-    await sql`
+    await dbSql`
       CREATE TABLE IF NOT EXISTS website_content (
         id INTEGER PRIMARY KEY DEFAULT 1,
         content JSONB NOT NULL,
@@ -32,7 +39,7 @@ export async function POST() {
     `
 
     // Check if we have any content
-    const existingContent = await sql`
+    const existingContent = await dbSql`
       SELECT COUNT(*) as count FROM website_content WHERE id = 1
     `
 
@@ -90,7 +97,7 @@ export async function POST() {
         ],
       }
 
-      await sql`
+      await dbSql`
         INSERT INTO website_content (id, content, updated_at)
         VALUES (1, ${JSON.stringify(defaultContent)}, NOW())
       `
