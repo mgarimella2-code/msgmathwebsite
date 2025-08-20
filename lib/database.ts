@@ -1,4 +1,4 @@
-// Database connection with proper Neon setup - FIXED VERSION
+// Database connection with FIXED save functionality
 let hasDatabase = false
 
 // Check if database is available
@@ -12,13 +12,7 @@ async function checkDatabaseAvailability() {
       process.env.POSTGRES_URL_NON_POOLING
 
     if (!neonUrl) {
-      console.log("No Neon database URL found - checking available env vars...")
-      console.log("Available DB env vars:", {
-        DATABASE_URL: !!process.env.DATABASE_URL,
-        POSTGRES_URL: !!process.env.POSTGRES_URL,
-        POSTGRES_PRISMA_URL: !!process.env.POSTGRES_PRISMA_URL,
-        POSTGRES_URL_NON_POOLING: !!process.env.POSTGRES_URL_NON_POOLING,
-      })
+      console.log("No Neon database URL found")
       return false
     }
 
@@ -29,19 +23,19 @@ async function checkDatabaseAvailability() {
       const { neon } = await import("@neondatabase/serverless")
       const sql = neon(neonUrl)
       await sql`SELECT 1 as test`
-      console.log("Neon serverless connection successful")
+      console.log("✅ Neon serverless connection successful")
       return true
     } catch (neonError) {
-      console.log("Neon serverless failed, trying Vercel Postgres:", neonError)
+      console.log("❌ Neon serverless failed, trying Vercel Postgres:", neonError)
 
       // Fallback to Vercel Postgres
       const { sql } = await import("@vercel/postgres")
       await sql`SELECT 1 as test`
-      console.log("Vercel Postgres connection successful")
+      console.log("✅ Vercel Postgres connection successful")
       return true
     }
   } catch (error) {
-    console.log("Database not available:", error instanceof Error ? error.message : "Unknown error")
+    console.log("❌ Database not available:", error instanceof Error ? error.message : "Unknown error")
     return false
   }
 }
@@ -51,12 +45,14 @@ export async function saveContentToDatabase(content: any) {
     if (!hasDatabase) {
       hasDatabase = await checkDatabaseAvailability()
       if (!hasDatabase) {
+        console.log("❌ Database not available for save")
         return { success: false, error: "Database not configured" }
       }
     }
 
-    console.log("💾 Saving content to database...")
+    console.log("💾 SAVING content to database...")
     console.log("💾 Content keys:", Object.keys(content))
+    console.log("💾 Announcements count:", content.announcements?.length || 0)
 
     // Get the connection string
     const neonUrl =
@@ -70,50 +66,97 @@ export async function saveContentToDatabase(content: any) {
     }
 
     let result
+    let method = "unknown"
+
     try {
       // Try Neon serverless first
       const { neon } = await import("@neondatabase/serverless")
       const sql = neon(neonUrl)
+      method = "neon-serverless"
 
-      // FIXED: Use proper UPSERT syntax
-      result = await sql`
-        INSERT INTO website_content (id, content, updated_at)
-        VALUES (1, ${JSON.stringify(content)}, NOW())
-        ON CONFLICT (id) 
-        DO UPDATE SET 
-          content = EXCLUDED.content,
-          updated_at = EXCLUDED.updated_at
-        RETURNING updated_at, id
-      `
+      console.log("💾 Using Neon serverless for save...")
+
+      // First, let's see what's currently in the database
+      const currentData = await sql`SELECT id, updated_at FROM website_content WHERE id = 1`
+      console.log("💾 Current database state:", currentData)
+
+      // Use a simple UPDATE if row exists, INSERT if not
+      if (currentData.length > 0) {
+        console.log("💾 Updating existing row...")
+        result = await sql`
+          UPDATE website_content 
+          SET content = ${JSON.stringify(content)}, updated_at = NOW()
+          WHERE id = 1
+          RETURNING id, updated_at, LENGTH(content::text) as new_size
+        `
+      } else {
+        console.log("💾 Inserting new row...")
+        result = await sql`
+          INSERT INTO website_content (id, content, updated_at)
+          VALUES (1, ${JSON.stringify(content)}, NOW())
+          RETURNING id, updated_at, LENGTH(content::text) as new_size
+        `
+      }
 
       console.log("✅ Neon save result:", result)
     } catch (neonError) {
-      console.log("❌ Neon save failed, trying Vercel Postgres:", neonError)
+      console.log("❌ Neon save failed:", neonError)
+      console.log("💾 Trying Vercel Postgres fallback...")
 
       // Fallback to Vercel Postgres
       const { sql } = await import("@vercel/postgres")
-      result = await sql`
-        INSERT INTO website_content (id, content, updated_at)
-        VALUES (1, ${JSON.stringify(content)}, NOW())
-        ON CONFLICT (id) 
-        DO UPDATE SET 
-          content = EXCLUDED.content,
-          updated_at = EXCLUDED.updated_at
-        RETURNING updated_at, id
-      `
+      method = "vercel-postgres"
+
+      // First, let's see what's currently in the database
+      const currentData = await sql`SELECT id, updated_at FROM website_content WHERE id = 1`
+      console.log("💾 Current database state (Vercel):", currentData.rows)
+
+      // Use a simple UPDATE if row exists, INSERT if not
+      if (currentData.rows.length > 0) {
+        console.log("💾 Updating existing row (Vercel)...")
+        result = await sql`
+          UPDATE website_content 
+          SET content = ${JSON.stringify(content)}, updated_at = NOW()
+          WHERE id = 1
+          RETURNING id, updated_at, LENGTH(content::text) as new_size
+        `
+      } else {
+        console.log("💾 Inserting new row (Vercel)...")
+        result = await sql`
+          INSERT INTO website_content (id, content, updated_at)
+          VALUES (1, ${JSON.stringify(content)}, NOW())
+          RETURNING id, updated_at, LENGTH(content::text) as new_size
+        `
+      }
 
       console.log("✅ Vercel Postgres save result:", result.rows)
+      result = result.rows // Normalize for Vercel Postgres
     }
 
-    console.log("✅ Content saved to database successfully")
-    return {
-      success: true,
-      timestamp: result[0]?.updated_at || result.rows?.[0]?.updated_at || new Date().toISOString(),
+    if (result && result.length > 0) {
+      const savedRow = result[0]
+      console.log("✅ SAVE SUCCESSFUL!")
+      console.log("✅ New size:", savedRow.new_size, "bytes")
+      console.log("✅ Updated at:", savedRow.updated_at)
+      console.log("✅ Method:", method)
+
+      return {
+        success: true,
+        timestamp: savedRow.updated_at,
+        method: method,
+        size: savedRow.new_size,
+      }
+    } else {
+      throw new Error("No result returned from database save")
     }
   } catch (error) {
     console.error("💥 Database save error:", error)
     hasDatabase = false // Reset flag on error
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      details: "Save operation failed - check console for details",
+    }
   }
 }
 
@@ -146,7 +189,7 @@ export async function loadContentFromDatabase() {
       const sql = neon(neonUrl)
 
       result = await sql`
-        SELECT content, updated_at 
+        SELECT content, updated_at, LENGTH(content::text) as content_size
         FROM website_content 
         WHERE id = 1
         ORDER BY updated_at DESC
@@ -154,13 +197,17 @@ export async function loadContentFromDatabase() {
       `
 
       console.log("📖 Neon load result:", result.length, "rows")
+      if (result.length > 0) {
+        console.log("📖 Content size:", result[0].content_size, "bytes")
+        console.log("📖 Content keys:", Object.keys(result[0].content))
+      }
     } catch (neonError) {
       console.log("❌ Neon load failed, trying Vercel Postgres:", neonError)
 
       // Fallback to Vercel Postgres
       const { sql } = await import("@vercel/postgres")
       result = await sql`
-        SELECT content, updated_at 
+        SELECT content, updated_at, LENGTH(content::text) as content_size
         FROM website_content 
         WHERE id = 1
         ORDER BY updated_at DESC
@@ -169,12 +216,15 @@ export async function loadContentFromDatabase() {
 
       console.log("📖 Vercel Postgres load result:", result.rows.length, "rows")
       result = result.rows // Normalize for Vercel Postgres
+      if (result.length > 0) {
+        console.log("📖 Content size:", result[0].content_size, "bytes")
+        console.log("📖 Content keys:", Object.keys(result[0].content))
+      }
     }
 
     if (result.length > 0) {
       const row = result[0]
       console.log("✅ Content loaded from database successfully")
-      console.log("✅ Content keys:", Object.keys(row.content))
       return {
         success: true,
         content: {
