@@ -14,9 +14,12 @@ export async function saveContentToStorage(content: any) {
 
     // Try database first (permanent storage) - but don't fail if unavailable
     try {
+      console.log("Trying database first...")
       const dbResult = await saveContentToDatabase(content)
+      console.log("Database result:", { success: dbResult.success, error: dbResult.error })
+
       if (dbResult.success) {
-        console.log("Content saved to database (permanent)")
+        console.log("SUCCESS: Content saved to database (permanent)")
         return { success: true, source: "database", permanent: true }
       } else {
         console.log("Database save failed, trying server fallback:", dbResult.error)
@@ -27,6 +30,7 @@ export async function saveContentToStorage(content: any) {
 
     // Fallback to server API (24-hour storage)
     try {
+      console.log("Trying server API...")
       const response = await fetch(API_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -34,7 +38,7 @@ export async function saveContentToStorage(content: any) {
       })
 
       if (response.ok) {
-        console.log("Content saved to server (24-hour limit)")
+        console.log("SUCCESS: Content saved to server (24-hour limit)")
         return { success: true, source: "server", permanent: false }
       } else {
         console.log("Server save failed, using localStorage only")
@@ -45,7 +49,7 @@ export async function saveContentToStorage(content: any) {
 
     // At minimum, localStorage worked (if we're in browser)
     if (typeof window !== "undefined") {
-      console.log("Content saved to localStorage only")
+      console.log("SUCCESS: Content saved to localStorage only")
       return { success: true, source: "localStorage", permanent: false }
     }
 
@@ -58,27 +62,35 @@ export async function saveContentToStorage(content: any) {
 
 export async function loadContentFromStorage() {
   try {
-    console.log("Loading content from storage...")
+    console.log("🔍 Loading content from storage...")
 
     // Try database first (most reliable) - but don't fail if unavailable
     try {
+      console.log("🗄️ Trying database first...")
       const dbResult = await loadContentFromDatabase()
+      console.log("🗄️ Database result:", {
+        success: dbResult.success,
+        hasContent: !!dbResult.content,
+        error: dbResult.error,
+      })
+
       if (dbResult.success && dbResult.content) {
-        console.log("Loaded content from database (permanent)")
+        console.log("✅ SUCCESS: Loaded content from database (permanent)")
         // Update localStorage with database content
         if (typeof window !== "undefined") {
           localStorage.setItem("ms-g-website-content", JSON.stringify(dbResult.content))
         }
         return { success: true, content: dbResult.content, source: "database" }
       } else {
-        console.log("Database load failed, trying server fallback:", dbResult.error)
+        console.log("❌ Database load failed, trying server fallback:", dbResult.error)
       }
     } catch (dbError) {
-      console.log("Database load error, trying server fallback:", dbError)
+      console.log("💥 Database load error, trying server fallback:", dbError)
     }
 
     // Fallback to server API
     try {
+      console.log("🌐 Trying server API...")
       const response = await fetch(API_BASE, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
@@ -86,16 +98,16 @@ export async function loadContentFromStorage() {
 
       if (response.ok) {
         const serverContent = await response.json()
-        console.log("Loaded content from server")
+        console.log("✅ SUCCESS: Loaded content from server (24-hour limit)")
         if (typeof window !== "undefined") {
           localStorage.setItem("ms-g-website-content", JSON.stringify(serverContent))
         }
         return { success: true, content: serverContent, source: "server" }
       } else {
-        console.log("Server load failed, trying localStorage")
+        console.log("❌ Server load failed, trying localStorage")
       }
     } catch (serverError) {
-      console.warn("Server load failed:", serverError)
+      console.warn("💥 Server load failed:", serverError)
     }
 
     // Final fallback to localStorage
@@ -103,14 +115,14 @@ export async function loadContentFromStorage() {
       const localContent = localStorage.getItem("ms-g-website-content")
       if (localContent) {
         const parsedContent = JSON.parse(localContent)
-        console.log("Loaded content from localStorage")
+        console.log("✅ SUCCESS: Loaded content from localStorage (browser only)")
         return { success: true, content: parsedContent, source: "localStorage" }
       }
     }
 
     throw new Error("No content available from any source")
   } catch (error) {
-    console.error("Error loading content:", error)
+    console.error("💥 Error loading content:", error)
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
   }
 }
@@ -119,7 +131,10 @@ export async function checkForUpdates(lastUpdateTime?: string) {
   try {
     // Check database first - but don't fail if unavailable
     try {
+      console.log("Checking database for updates...")
       const dbResult = await checkDatabaseForUpdates(lastUpdateTime)
+      console.log("Database update check result:", { hasUpdates: dbResult.hasUpdates, error: dbResult.error })
+
       if (dbResult.hasUpdates) {
         return dbResult
       }
@@ -129,12 +144,14 @@ export async function checkForUpdates(lastUpdateTime?: string) {
 
     // Fallback to server check
     try {
+      console.log("Checking server for updates...")
       const response = await fetch(`${API_BASE}?lastUpdate=${lastUpdateTime || ""}`, {
         cache: "no-store",
       })
 
       if (response.ok) {
         const data = await response.json()
+        console.log("Server update check result:", { hasUpdates: data.hasUpdates })
         return { hasUpdates: data.hasUpdates, content: data.content }
       }
     } catch (serverError) {
