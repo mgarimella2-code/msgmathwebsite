@@ -3,14 +3,17 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { ExternalLink, RefreshCw } from "lucide-react"
+import { ExternalLink, RefreshCw, Bug, AlertTriangle } from "lucide-react"
 import { loadContentFromStorage, checkForUpdates } from "@/lib/storage"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function HomePage() {
   const [content, setContent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [lastUpdate, setLastUpdate] = useState<string>("")
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   useEffect(() => {
     loadContent()
@@ -25,18 +28,32 @@ export default function HomePage() {
       setLoading(true)
       setError("")
 
+      console.log("🏠 HOMEPAGE: Loading content...")
+
       const result = await loadContentFromStorage()
 
       if (result.success && result.content) {
         setContent(result.content)
         setLastUpdate(result.content._lastUpdate || new Date().toISOString())
-        console.log(`Loaded content from ${result.source}`)
+        console.log(`🏠 HOMEPAGE: Loaded content from ${result.source}`)
+
+        // Store debug info for homepage
+        setDebugInfo({
+          loadedFrom: result.source,
+          loadedAt: new Date().toISOString(),
+          contentKeys: Object.keys(result.content),
+          announcementCount: result.content.announcements?.length || 0,
+          classCount: Object.keys(result.content.classes || {}).length,
+          isIncognito: !window.localStorage || window.localStorage.length === 0,
+          hasLocalStorage: !!window.localStorage,
+          userAgent: navigator.userAgent.includes("Chrome") ? "Chrome" : "Other",
+        })
       } else {
         throw new Error(result.error || "Failed to load content")
       }
     } catch (err) {
       setError("Failed to load content")
-      console.error("Load error:", err)
+      console.error("🏠 HOMEPAGE: Load error:", err)
     } finally {
       setLoading(false)
     }
@@ -50,10 +67,41 @@ export default function HomePage() {
       if (result.hasUpdates && result.content) {
         setContent(result.content)
         setLastUpdate(result.content._lastUpdate || new Date().toISOString())
-        console.log("Content updated from server")
+        console.log("🏠 HOMEPAGE: Content updated from server")
       }
     } catch (err) {
-      console.warn("Failed to check for updates:", err)
+      console.warn("🏠 HOMEPAGE: Failed to check for updates:", err)
+    }
+  }
+
+  const testDirectDatabaseLoad = async () => {
+    try {
+      console.log("🧪 HOMEPAGE: Testing direct database load...")
+
+      const response = await fetch(`/api/load-content?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log("🧪 HOMEPAGE: Direct database result:", result)
+
+        if (result.success && result.content) {
+          setContent(result.content)
+          alert(`✅ Direct database load successful!
+Announcements: ${result.content.announcements?.length || 0}
+Classes: ${Object.keys(result.content.classes || {}).length}
+Source: Database`)
+        } else {
+          alert(`❌ Direct database load failed: ${result.error}`)
+        }
+      } else {
+        alert(`❌ Database API failed: ${response.status}`)
+      }
+    } catch (error) {
+      console.error("🧪 HOMEPAGE: Database test failed:", error)
+      alert(`❌ Database test error: ${error}`)
     }
   }
 
@@ -73,9 +121,14 @@ export default function HomePage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="text-center">
           <p className="text-red-600 mb-4">Failed to load content</p>
-          <button onClick={loadContent} className="px-4 py-2 bg-purple-600 text-white rounded">
-            Try Again
-          </button>
+          <div className="flex gap-2 justify-center">
+            <button onClick={loadContent} className="px-4 py-2 bg-purple-600 text-white rounded">
+              Try Again
+            </button>
+            <button onClick={testDirectDatabaseLoad} className="px-4 py-2 bg-yellow-600 text-white rounded">
+              🧪 Test Database
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -85,6 +138,51 @@ export default function HomePage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      {/* Debug Info for Homepage */}
+      {debugInfo && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <Bug className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <div className="flex justify-between items-start">
+              <div>
+                <strong>🏠 HOMEPAGE DEBUG:</strong>
+                <div className="text-sm mt-1 space-y-1">
+                  <div>
+                    📖 Loaded from: <strong>{debugInfo.loadedFrom}</strong>
+                  </div>
+                  <div>
+                    📊 Announcements: <strong>{debugInfo.announcementCount}</strong>
+                  </div>
+                  <div>
+                    🏫 Classes: <strong>{debugInfo.classCount}</strong>
+                  </div>
+                  <div>
+                    🕐 Loaded at: <strong>{debugInfo.loadedAt}</strong>
+                  </div>
+                  <div>
+                    🔒 Incognito mode: <strong>{debugInfo.isIncognito ? "YES" : "NO"}</strong>
+                  </div>
+                </div>
+              </div>
+              <Button onClick={testDirectDatabaseLoad} size="sm" variant="outline" className="bg-yellow-50">
+                🧪 Test DB
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Show if this is likely incognito mode */}
+      {debugInfo?.isIncognito && (
+        <Alert className="border-orange-200 bg-orange-50">
+          <AlertTriangle className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-orange-800">
+            <strong>🔒 Incognito Mode Detected:</strong> This page is loading from {debugInfo.loadedFrom}. If you made
+            changes in admin, they should appear here if database is working.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Welcome Section */}
       <Card className="bg-white/70 backdrop-blur-sm">
         <CardHeader>
